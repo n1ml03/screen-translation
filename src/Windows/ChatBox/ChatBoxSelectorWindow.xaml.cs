@@ -12,6 +12,8 @@ using Key = System.Windows.Input.Key;
 using MessageBox = System.Windows.MessageBox;
 using Forms = System.Windows.Forms;
 
+#pragma warning disable CA1416 // Validate platform compatibility
+
 namespace ScreenTranslation
 {
     public partial class ChatBoxSelectorWindow : Window

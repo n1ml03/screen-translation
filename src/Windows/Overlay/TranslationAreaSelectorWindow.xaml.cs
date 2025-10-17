@@ -14,6 +14,8 @@ using Forms = System.Windows.Forms;
 using System.Windows.Interop;
 using System.Runtime.InteropServices;
 
+#pragma warning disable CA1416 // Validate platform compatibility
+
 namespace ScreenTranslation
 {
     public partial class TranslationAreaSelectorWindow : Window
@@ -27,7 +29,7 @@ namespace ScreenTranslation
         private static TranslationAreaSelectorWindow? _currentInstance;
         
         // Store the selected screen and its DPI scaling
-        private Forms.Screen _selectedScreen;
+        private Forms.Screen? _selectedScreen;
         private double _dpiScaleX = 1.0;
         private double _dpiScaleY = 1.0;
         
@@ -85,8 +87,15 @@ namespace ScreenTranslation
         }
         
         // Get DPI scaling for a screen
-        private void GetDpiScaling(Forms.Screen screen)
+        private void GetDpiScaling(Forms.Screen? screen)
         {
+            if (screen == null)
+            {
+                _dpiScaleX = 1.0;
+                _dpiScaleY = 1.0;
+                return;
+            }
+
             try
             {
                 // Get the monitor handle from screen
@@ -161,6 +170,7 @@ namespace ScreenTranslation
                     }
                     
                     // Set window position using Windows API
+                    if (_selectedScreen == null) return;
                     var bounds = _selectedScreen.Bounds;
                     SetWindowPos(
                         hwnd,
@@ -196,7 +206,10 @@ namespace ScreenTranslation
                     
                     // Use primary screen as fallback
                     _selectedScreen = Forms.Screen.PrimaryScreen;
-                    GetDpiScaling(_selectedScreen);
+                    if (_selectedScreen != null)
+                    {
+                        GetDpiScaling(_selectedScreen);
+                    }
                 }
                 
                 // Position instruction text above the MainWindow
@@ -214,7 +227,10 @@ namespace ScreenTranslation
                 
                 // Use primary screen as fallback
                 _selectedScreen = Forms.Screen.PrimaryScreen;
-                GetDpiScaling(_selectedScreen);
+                if (_selectedScreen != null)
+                {
+                    GetDpiScaling(_selectedScreen);
+                }
             }
         }
         
@@ -437,6 +453,7 @@ namespace ScreenTranslation
                 {
                     // Adjust for DPI scaling
                     // The offset from screen origin needs to be scaled
+                    if (_selectedScreen == null) return;
                     double offsetX = screenX - _selectedScreen.Bounds.Left;
                     double offsetY = screenY - _selectedScreen.Bounds.Top;
                     
@@ -487,6 +504,7 @@ namespace ScreenTranslation
                     if (_dpiScaleX != 1.0 || _dpiScaleY != 1.0)
                     {
                         // Adjust for DPI scaling
+                        if (_selectedScreen == null) return;
                         double offsetX = screenPoint.X - _selectedScreen.Bounds.Left;
                         double offsetY = screenPoint.Y - _selectedScreen.Bounds.Top;
                         
@@ -531,6 +549,7 @@ namespace ScreenTranslation
                     Console.WriteLine($"Fallback approach also failed: {ex2.Message}");
                     
                     // Last resort: use the raw coordinates without any adjustment
+                    if (_selectedScreen == null) return;
                     Rect selectionRect = new Rect(
                         _selectedScreen.Bounds.Left + left,
                         _selectedScreen.Bounds.Top + top,

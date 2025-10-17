@@ -18,7 +18,6 @@ namespace ScreenTranslation
             return currentService switch
             {
                 "ChatGPT" => new ChatGptTranslationService(),
-                "Google Translate" => new GoogleTranslateService(),
                 _ => new ChatGptTranslationService() // Default to ChatGPT if unknown
             };
         }
@@ -26,14 +25,13 @@ namespace ScreenTranslation
         /// <summary>
         /// Create a specific translation service by name
         /// </summary>
-        /// <param name="serviceName">Name of the service (ChatGPT or Google Translate)</param>
+        /// <param name="serviceName">Name of the service (ChatGPT)</param>
         /// <returns>An implementation of ITranslationService</returns>
         public static ITranslationService CreateService(string serviceName)
         {
             return serviceName switch
             {
                 "ChatGPT" => new ChatGptTranslationService(),
-                "Google Translate" => new GoogleTranslateService(),
                 _ => throw new ArgumentException($"Unknown translation service: {serviceName}")
             };
         }

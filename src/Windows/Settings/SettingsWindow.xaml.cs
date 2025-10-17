@@ -19,6 +19,8 @@ using System.Windows.Interop;
 using Windows.Media.SpeechSynthesis;
 using System.IO;
 
+#pragma warning disable CA1416 // Validate platform compatibility
+
 namespace ScreenTranslation
 {
     // Class to represent an ignore phrase
@@ -457,106 +459,8 @@ namespace ScreenTranslation
             KeyboardShortcuts.HandleKeyDown(e);
         }
 
-        // Google Translate API Key changed
-        private void GoogleTranslateApiKeyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Skip if initializing
-                if (_isInitializing)
-                    return;
 
-                // string apiKey = googleTranslateApiKeyPasswordBox.Password.Trim();
 
-                // // Update the config
-                // ConfigManager.Instance.SetGoogleTranslateApiKey(apiKey);
-                Console.WriteLine("Google Translate API key updated");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating Google Translate API key: {ex.Message}");
-            }
-        }
-
-        // Google Translate Service Type changed
-        private void GoogleTranslateServiceTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            try
-            {
-                // Skip if initializing
-                if (_isInitializing)
-                    return;
-
-                if (googleTranslateServiceTypeComboBox.SelectedItem is ComboBoxItem selectedItem)
-                {
-                    bool isCloudApi = selectedItem.Content.ToString() == "Cloud API (paid)";
-
-                    // Show/hide API key field based on selection
-                    googleTranslateApiKeyLabel.Visibility = isCloudApi ? Visibility.Visible : Visibility.Collapsed;
-                    googleTranslateApiKeyGrid.Visibility = isCloudApi ? Visibility.Visible : Visibility.Collapsed;
-                    // viewGoogleTranslateKeysButton.Visibility = isCloudApi ? Visibility.Visible : Visibility.Collapsed;
-
-                    // Save to config
-                    ConfigManager.Instance.SetGoogleTranslateUseCloudApi(isCloudApi);
-                    Console.WriteLine($"Google Translate service type set to: {(isCloudApi ? "Cloud API" : "Free Web Service")}");
-
-                    // Trigger retranslation if the current service is Google Translate
-                    if (ConfigManager.Instance.GetCurrentTranslationService() == "Google Translate")
-                    {
-                        Console.WriteLine("Google Translate service type changed. Triggering retranslation...");
-
-                        // Reset the hash to force a retranslation
-                        Logic.Instance.ResetHash();
-
-                        // Clear any existing text objects to refresh the display
-                        Logic.Instance.ClearAllTextObjects();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating Google Translate service type: {ex.Message}");
-            }
-        }
-
-        // Google Translate language mapping checkbox changed
-        private void GoogleTranslateMappingCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Skip if initializing
-                if (_isInitializing)
-                    return;
-
-                bool isEnabled = googleTranslateMappingCheckBox.IsChecked ?? true;
-
-                // Save to config
-                ConfigManager.Instance.SetGoogleTranslateAutoMapLanguages(isEnabled);
-                Console.WriteLine($"Google Translate auto language mapping set to: {isEnabled}");
-
-                // Trigger retranslation if the current service is Google Translate
-                if (ConfigManager.Instance.GetCurrentTranslationService() == "Google Translate")
-                {
-                    Console.WriteLine("Google Translate language mapping changed. Triggering retranslation...");
-
-                    // Reset the hash to force a retranslation
-                    Logic.Instance.ResetHash();
-
-                    // Clear any existing text objects to refresh the display
-                    Logic.Instance.ClearAllTextObjects();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating Google Translate language mapping: {ex.Message}");
-            }
-        }
-
-        // Google Translate API link click
-        private void GoogleTranslateApiLink_Click(object sender, RoutedEventArgs e)
-        {
-            OpenUrl("https://cloud.google.com/translate/docs/setup");
-        }
 
         // Helper method to check if a window instance is still valid
         private static bool IsWindowValid(Window window)
@@ -757,7 +661,6 @@ namespace ScreenTranslation
             ttsEnabledCheckBox.Checked -= TtsEnabledCheckBox_CheckedChanged;
             ttsEnabledCheckBox.Unchecked -= TtsEnabledCheckBox_CheckedChanged;
             ttsServiceComboBox.SelectionChanged -= TtsServiceComboBox_SelectionChanged;
-            googleTtsVoiceComboBox.SelectionChanged -= GoogleTtsVoiceComboBox_SelectionChanged;
             windowTTSVoiceComboBox.SelectionChanged -= WindowTTSVoiceComboBox_SelectionChanged;
 
             // Set TTS enabled state
@@ -791,25 +694,10 @@ namespace ScreenTranslation
                 }
             }
 
-            // Set Google TTS API key
-            googleTtsApiKeyPasswordBox.Password = ConfigManager.Instance.GetGoogleTtsApiKey();
-
-            // Set Google TTS voice
-            string googleVoiceId = ConfigManager.Instance.GetGoogleTtsVoice();
-            foreach (ComboBoxItem item in googleTtsVoiceComboBox.Items)
-            {
-                if (string.Equals(item.Tag?.ToString(), googleVoiceId, StringComparison.OrdinalIgnoreCase))
-                {
-                    googleTtsVoiceComboBox.SelectedItem = item;
-                    break;
-                }
-            }
-
             // Re-attach TTS event handlers
             ttsEnabledCheckBox.Checked += TtsEnabledCheckBox_CheckedChanged;
             ttsEnabledCheckBox.Unchecked += TtsEnabledCheckBox_CheckedChanged;
             ttsServiceComboBox.SelectionChanged += TtsServiceComboBox_SelectionChanged;
-            googleTtsVoiceComboBox.SelectionChanged += GoogleTtsVoiceComboBox_SelectionChanged;
             windowTTSVoiceComboBox.SelectionChanged += WindowTTSVoiceComboBox_SelectionChanged;
 
             // Load ignore phrases
@@ -1360,54 +1248,39 @@ namespace ScreenTranslation
             try
             {
                 bool isChatGptSelected = selectedService == "ChatGPT";
-                bool isGoogleTranslateSelected = selectedService == "Google Translate";
 
                 // Make sure the window is fully loaded and controls are initialized
-                if (chatGptApiKeyLabel == null || chatGptApiKeyGrid == null ||
-                    chatGptModelLabel == null || chatGptModelGrid == null ||
-                    googleTranslateApiKeyLabel == null || googleTranslateApiKeyGrid == null ||
-                    googleTranslateServiceTypeLabel == null || googleTranslateServiceTypeComboBox == null ||
-                    googleTranslateMappingLabel == null || googleTranslateMappingCheckBox == null)
+                if (chatGptUsernameLabel == null || chatGptUsernameTextBox == null ||
+                    chatGptEndpointLabel == null || chatGptEndpointTextBox == null ||
+                    chatGptPasswordLabel == null || chatGptPasswordBox == null ||
+                    chatGptModelLabel == null || chatGptModelGrid == null)
                 {
                     Console.WriteLine("UI elements not initialized yet. Skipping visibility update.");
                     return;
                 }
 
                 // Show/hide ChatGPT-specific settings
-                chatGptApiKeyLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
-                chatGptApiKeyGrid.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptUsernameLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptUsernameTextBox.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptEndpointLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptEndpointTextBox.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptPasswordLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptPasswordBox.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
                 chatGptModelLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
                 chatGptModelGrid.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
-                viewChatGptKeysButton.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
-                chatGptNote.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
 
-                // Show/hide Google Translate-specific settings
-                googleTranslateServiceTypeLabel.Visibility = isGoogleTranslateSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTranslateServiceTypeComboBox.Visibility = isGoogleTranslateSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTranslateMappingLabel.Visibility = isGoogleTranslateSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTranslateMappingCheckBox.Visibility = isGoogleTranslateSelected ? Visibility.Visible : Visibility.Collapsed;
-
-                // Hide prompt template for Google Translate
-                bool showPromptTemplate = !isGoogleTranslateSelected;
-
-                // API key is only visible for Google Translate if Cloud API is selected
-                bool showGoogleTranslateApiKey = isGoogleTranslateSelected &&
-                    (googleTranslateServiceTypeComboBox.SelectedItem as ComboBoxItem)?.Content.ToString() == "Cloud API (paid)";
-
-                googleTranslateApiKeyLabel.Visibility = showGoogleTranslateApiKey ? Visibility.Visible : Visibility.Collapsed;
-                googleTranslateApiKeyGrid.Visibility = showGoogleTranslateApiKey ? Visibility.Visible : Visibility.Collapsed;
-                // viewGoogleTranslateKeysButton.Visibility = showGoogleTranslateApiKey ? Visibility.Visible : Visibility.Collapsed;
-
-                // Show/hide prompt template and related controls for Google Translate
-                promptLabel.Visibility = showPromptTemplate ? Visibility.Visible : Visibility.Collapsed;
-                promptTemplateTextBox.Visibility = showPromptTemplate ? Visibility.Visible : Visibility.Collapsed;
-                savePromptButton.Visibility = showPromptTemplate ? Visibility.Visible : Visibility.Collapsed;
-                restoreDefaultPromptButton.Visibility = showPromptTemplate ? Visibility.Visible : Visibility.Collapsed;
+                // Always show prompt template for ChatGPT
+                promptLabel.Visibility = Visibility.Visible;
+                promptTemplateTextBox.Visibility = Visibility.Visible;
+                savePromptButton.Visibility = Visibility.Visible;
+                restoreDefaultPromptButton.Visibility = Visibility.Visible;
 
                 // Load service-specific settings if they're being shown
                 if (isChatGptSelected)
                 {
-                    chatGptApiKeyPasswordBox.Password = ConfigManager.Instance.GetChatGptApiKey();
+                    chatGptUsernameTextBox.Text = ConfigManager.Instance.GetChatGptUsername();
+                    chatGptEndpointTextBox.Text = ConfigManager.Instance.GetChatGptEndpoint();
+                    chatGptPasswordBox.Password = ConfigManager.Instance.GetChatGptPassword();
 
                     // Set selected model
                     string model = ConfigManager.Instance.GetChatGptModel();
@@ -1419,28 +1292,6 @@ namespace ScreenTranslation
                             break;
                         }
                     }
-                }
-                else if (isGoogleTranslateSelected)
-                {
-                    // Set Google Translate service type
-                    bool useCloudApi = ConfigManager.Instance.GetGoogleTranslateUseCloudApi();
-
-                    // Temporarily remove event handler
-                    googleTranslateServiceTypeComboBox.SelectionChanged -= GoogleTranslateServiceTypeComboBox_SelectionChanged;
-
-                    googleTranslateServiceTypeComboBox.SelectedIndex = useCloudApi ? 1 : 0; // 0 = Free, 1 = Cloud API
-
-                    // Reattach event handler
-                    googleTranslateServiceTypeComboBox.SelectionChanged += GoogleTranslateServiceTypeComboBox_SelectionChanged;
-
-                    // Set API key if using Cloud API
-                    if (useCloudApi)
-                    {
-                        googleTranslateApiKeyPasswordBox.Password = ConfigManager.Instance.GetGoogleTranslateApiKey();
-                    }
-
-                    // Set language mapping checkbox
-                    googleTranslateMappingCheckBox.IsChecked = ConfigManager.Instance.GetGoogleTranslateAutoMapLanguages();
                 }
             }
             catch (Exception ex)
@@ -1522,55 +1373,26 @@ namespace ScreenTranslation
         {
             try
             {
-                bool isGoogleTtsSelected = selectedService == "Google Cloud TTS";
-                bool isWindowTtsSelected = selectedService == "Windows TTS";
-
                 // Make sure the window is fully loaded and controls are initialized
-                if (googleTtsApiKeyLabel == null ||
-                    googleTtsApiKeyGrid == null || googleTtsVoiceLabel == null ||
-                    googleTtsVoiceComboBox == null || windowTTSVoiceLabel == null || windowTTSVoiceComboBox == null)
+                if (windowTTSVoiceLabel == null || windowTTSVoiceComboBox == null)
                 {
                     Console.WriteLine("TTS UI elements not initialized yet. Skipping visibility update.");
                     return;
                 }
 
-                // Show/hide Google TTS-specific settings
-                googleTtsApiKeyLabel.Visibility = isGoogleTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTtsApiKeyGrid.Visibility = isGoogleTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTtsVoiceLabel.Visibility = isGoogleTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                googleTtsVoiceComboBox.Visibility = isGoogleTtsSelected ? Visibility.Visible : Visibility.Collapsed;
+                // Show Windows TTS-specific settings (always visible since it's the only option)
+                windowTTSVoiceLabel.Visibility = Visibility.Visible;
+                windowTTSVoiceComboBox.Visibility = Visibility.Visible;
+                windowsTTSGuide.Visibility = Visibility.Visible;
 
-                // Show/hide Window TTS-specific settings
-                windowTTSVoiceLabel.Visibility = isWindowTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                windowTTSVoiceComboBox.Visibility = isWindowTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                windowsTTSGuide.Visibility = isWindowTtsSelected ? Visibility.Visible : Visibility.Collapsed;
-                // Load service-specific settings if they're being shown
-                if (isGoogleTtsSelected)
+                // Set selected voice
+                string voiceId = ConfigManager.Instance.GetWindowsTtsVoice();
+                foreach (ComboBoxItem item in windowTTSVoiceComboBox.Items)
                 {
-                    googleTtsApiKeyPasswordBox.Password = ConfigManager.Instance.GetGoogleTtsApiKey();
-
-                    // Set selected voice
-                    string voiceId = ConfigManager.Instance.GetGoogleTtsVoice();
-                    foreach (ComboBoxItem item in googleTtsVoiceComboBox.Items)
+                    if (string.Equals(item.Content?.ToString(), voiceId, StringComparison.OrdinalIgnoreCase))
                     {
-                        if (string.Equals(item.Tag?.ToString(), voiceId, StringComparison.OrdinalIgnoreCase))
-                        {
-                            googleTtsVoiceComboBox.SelectedItem = item;
-                            break;
-                        }
-                    }
-                }
-                else if (isWindowTtsSelected)
-                {
-                    // Set selected voice
-                    string voiceId = ConfigManager.Instance.GetWindowsTtsVoice();
-                    foreach (ComboBoxItem item in windowTTSVoiceComboBox.Items)
-                    {
-                        if (string.Equals(item.Content?.ToString(), voiceId, StringComparison.OrdinalIgnoreCase))
-                        {
-                            windowTTSVoiceComboBox.SelectedItem = item;
-                            break;
-                        }
+                        windowTTSVoiceComboBox.SelectedItem = item;
+                        break;
                     }
                 }
             }
@@ -1648,10 +1470,6 @@ namespace ScreenTranslation
             }
         }
 
-        private void GoogleTtsApiLink_Click(object sender, RoutedEventArgs e)
-        {
-            OpenUrl("https://cloud.google.com/text-to-speech");
-        }
         private void NaturalVoiceSAPIAdapterLink_Click(object sender, RoutedEventArgs e)
         {
             OpenUrl("https://github.com/gexgd0419/NaturalVoiceSAPIAdapter");
@@ -1720,44 +1538,7 @@ namespace ScreenTranslation
             }
         }
 
-        private void GoogleTtsApiKeyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Skip if initializing
-                if (_isInitializing)
-                    return;
 
-                string apiKey = googleTtsApiKeyPasswordBox.Password.Trim();
-                ConfigManager.Instance.SetGoogleTtsApiKey(apiKey);
-                Console.WriteLine("Google TTS API key updated");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating Google TTS API key: {ex.Message}");
-            }
-        }
-
-        private void GoogleTtsVoiceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            try
-            {
-                // Skip if initializing
-                if (_isInitializing)
-                    return;
-
-                if (googleTtsVoiceComboBox.SelectedItem is ComboBoxItem selectedItem)
-                {
-                    string voiceId = selectedItem.Tag?.ToString() ?? "ja-JP-Neural2-B"; // Default to Female A
-                    ConfigManager.Instance.SetGoogleTtsVoice(voiceId);
-                    Console.WriteLine($"Google TTS voice set to: {selectedItem.Content} (ID: {voiceId})");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating Google TTS voice: {ex.Message}");
-            }
-        }
 
 
         private void WindowTTSVoiceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2725,6 +2506,22 @@ namespace ScreenTranslation
             bool enabled = excludeCharacterNameCheckBox.IsChecked ?? false;
             ConfigManager.Instance.SetExcludeCharacterName(enabled);
             Console.WriteLine($"Exclude character name set to {enabled}");
+        }
+
+        // ChatGPT credential event handlers
+        private void ChatGptUsernameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ConfigManager.Instance.SetChatGptUsername(chatGptUsernameTextBox.Text);
+        }
+
+        private void ChatGptEndpointTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ConfigManager.Instance.SetChatGptEndpoint(chatGptEndpointTextBox.Text);
+        }
+
+        private void ChatGptPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            ConfigManager.Instance.SetChatGptPassword(chatGptPasswordBox.Password);
         }
     }
 }

@@ -18,7 +18,6 @@ namespace ScreenTranslation
         private readonly string _configFilePath;
         public readonly string _profileFolderPath;
         private readonly string _chatgptConfigFilePath;
-        private readonly string _googleTranslateConfigFilePath;
         private readonly Dictionary<string, string> _configValues;
         private string _currentTranslationService = "ChatGPT"; // Default to ChatGPT
 
@@ -30,8 +29,6 @@ namespace ScreenTranslation
         private const string SEND_DATA_TO_SERVER = "send_data_to_server";
         private const string SHOW_ICON_SIGNAL = "show_icon_signal";
         public const string CHATGPT_API_KEYS = "chatgpt_api_keys";
-        public const string GOOGLE_TRANSLATE_API_KEYS = "google_translate_api_keys";
-        public const string GOOGLE_TTS_API_KEYS = "google_tts_api_keys";
         public const string OPENAI_REALTIME_API_KEYS = "openai_realtime_api_keys";
         public const string SHOW_QUICK_START = "show_quick_start";
 
@@ -54,14 +51,12 @@ namespace ScreenTranslation
         // Config keys
         public const string TRANSLATION_SERVICE = "translation_service";
         public const string OCR_METHOD = "ocr_method";
-        public const string CHATGPT_API_KEY = "chatgpt_api_key";
+        public const string CHATGPT_USERNAME = "chatgpt_username";
+        public const string CHATGPT_ENDPOINT = "chatgpt_endpoint";
+        public const string CHATGPT_PASSWORD = "chatgpt_password";
         public const string CHATGPT_MODEL = "chatgpt_model";
         public const string FORCE_CURSOR_VISIBLE = "force_cursor_visible";
         public const string AUTO_SIZE_TEXT_BLOCKS = "auto_size_text_blocks";
-        public const string GOOGLE_TRANSLATE_API_KEY = "google_translate_api_key";
-        // Google Translate settings
-        public const string GOOGLE_TRANSLATE_USE_CLOUD_API = "google_translate_use_cloud_api";
-        public const string GOOGLE_TRANSLATE_AUTO_MAP_LANGUAGES = "google_translate_auto_map_languages";
 
         // Translation context keys
         public const string MAX_CONTEXT_PIECES = "max_context_pieces";
@@ -85,8 +80,6 @@ namespace ScreenTranslation
         // Text-to-Speech configuration keys
         public const string TTS_ENABLED = "tts_enabled";
         public const string TTS_SERVICE = "tts_service";
-        public const string GOOGLE_TTS_API_KEY = "google_tts_api_key";
-        public const string GOOGLE_TTS_VOICE = "google_tts_voice";
         public const string WINDOWS_TTS_VOICE = "windows_tts_voice";
         public const string EXCLUDE_CHARACTER_NAME = "exclude_character_name";
 
@@ -163,12 +156,10 @@ namespace ScreenTranslation
             _configFilePath = Path.Combine(appDirectory, "config.txt");
             _profileFolderPath = Path.Combine(appDirectory, "Profiles");
             _chatgptConfigFilePath = Path.Combine(appDirectory, "chatgpt_config.txt");
-            _googleTranslateConfigFilePath = Path.Combine(appDirectory, "google_translate_config.txt");
 
             Console.WriteLine($"Config file path: {_configFilePath}");
             Console.WriteLine($"Profile folder path: {_profileFolderPath}");
             Console.WriteLine($"ChatGPT config file path: {_chatgptConfigFilePath}");
-            Console.WriteLine($"Google Translate config file path: {_googleTranslateConfigFilePath}");
 
             // Load main config values
             LoadConfig();
@@ -248,30 +239,7 @@ namespace ScreenTranslation
             Console.WriteLine("===============================");
         }
 
-        public bool GetGoogleTranslateUseCloudApi()
-        {
-            return GetBoolValue(GOOGLE_TRANSLATE_USE_CLOUD_API, false);
-        }
 
-        public void SetGoogleTranslateUseCloudApi(bool useCloudApi)
-        {
-            _configValues[GOOGLE_TRANSLATE_USE_CLOUD_API] = useCloudApi.ToString();
-            SaveConfig();
-            Console.WriteLine($"Google Translate Cloud API usage set to: {useCloudApi}");
-        }
-
-        // Set/Get Google Translate auto language mapping
-        public bool GetGoogleTranslateAutoMapLanguages()
-        {
-            return GetBoolValue(GOOGLE_TRANSLATE_AUTO_MAP_LANGUAGES, true);
-        }
-
-        public void SetGoogleTranslateAutoMapLanguages(bool autoMap)
-        {
-            _configValues[GOOGLE_TRANSLATE_AUTO_MAP_LANGUAGES] = autoMap.ToString();
-            SaveConfig();
-            Console.WriteLine($"Google Translate auto language mapping set to: {autoMap}");
-        }
 
         // Create default configuration
         private void CreateDefaultConfig()
@@ -294,16 +262,16 @@ namespace ScreenTranslation
             _configValues[SOURCE_LANGUAGE] = "en";
             _configValues[TARGET_LANGUAGE] = "vi";
             _configValues[TTS_SERVICE] = "Windows TTS";
-            _configValues[GOOGLE_TTS_API_KEY] = "<your API key here>";
-            _configValues[GOOGLE_TTS_VOICE] = "ja-JP-Neural2-B";
             _configValues[WINDOWS_TTS_VOICE ] = "Microsoft David (en-US, Male)";
             _configValues[TTS_ENABLED] = "false";
             _configValues[MAX_CONTEXT_PIECES] = "20";
             _configValues[MIN_CONTEXT_SIZE] = "8";
             _configValues[GAME_INFO] = "We're playing an unspecified game.";
             _configValues[MIN_TEXT_FRAGMENT_SIZE] = "1";
-            _configValues[CHATGPT_MODEL] = "gpt-4.1-nano";
-            _configValues[CHATGPT_API_KEY] = "<your API key here>";
+            _configValues[CHATGPT_MODEL] = "gpt-41-nano";
+            _configValues[CHATGPT_USERNAME] = "<your username here>";
+            _configValues[CHATGPT_ENDPOINT] = "<your endpoint here>";
+            _configValues[CHATGPT_PASSWORD] = "<your password here>";
             _configValues[BLOCK_DETECTION_SCALE] = "3.00";
             _configValues[BLOCK_DETECTION_SETTLE_TIME] = "0.15";
             _configValues[KEEP_TRANSLATED_TEXT_UNTIL_REPLACED] = "true";
@@ -729,7 +697,7 @@ namespace ScreenTranslation
         // Set current translation service
         public void SetTranslationService(string service)
         {
-            if (service == "ChatGPT" || service == "Google Translate")
+            if (service == "ChatGPT")
             {
                 _currentTranslationService = service;
                 _configValues[TRANSLATION_SERVICE] = service;
@@ -793,8 +761,6 @@ namespace ScreenTranslation
                     File.WriteAllText(_chatgptConfigFilePath, chatgptContent);
                     Console.WriteLine("Created default ChatGPT config file");
                 }
-
-                // Google Translate doesn't use prompts, so no need to create config file
             }
             catch (Exception ex)
             {
@@ -811,12 +777,6 @@ namespace ScreenTranslation
         // Get prompt for specific translation service
         public string GetServicePrompt(string service)
         {
-            // Google Translate doesn't use prompts
-            if (service == "Google Translate")
-            {
-                return "";
-            }
-
             string filePath;
 
             switch (service)
@@ -858,12 +818,6 @@ namespace ScreenTranslation
         // Save prompt for specific translation service
         public bool SaveServicePrompt(string service, string prompt)
         {
-            // Google Translate doesn't use prompts
-            if (service == "Google Translate")
-            {
-                return true;
-            }
-
             string filePath;
 
             switch (service)
@@ -1450,48 +1404,45 @@ namespace ScreenTranslation
         }
 
 
-        // Get/Set Google TTS API key
-        public string GetGoogleTtsApiKey()
-        {
-            return GetValue(GOOGLE_TTS_API_KEY, "");
-        }
-
-        public void SetGoogleTtsApiKey(string apiKey)
-        {
-            _configValues[GOOGLE_TTS_API_KEY] = apiKey;
-            SaveConfig();
-            Console.WriteLine("Google TTS API key updated");
-        }
-
-        // Get/Set Google TTS voice
-        public string GetGoogleTtsVoice()
-        {
-            return GetValue(GOOGLE_TTS_VOICE, "ja-JP-Neural2-B"); // Default to Female - Neural2
-        }
-
-        public void SetGoogleTtsVoice(string voiceId)
-        {
-            if (!string.IsNullOrWhiteSpace(voiceId))
-            {
-                _configValues[GOOGLE_TTS_VOICE] = voiceId;
-                SaveConfig();
-                Console.WriteLine($"Google TTS voice set to: {voiceId}");
-            }
-        }
-
         // ChatGPT methods
 
-        // Get/Set ChatGPT API key
-        public string GetChatGptApiKey()
+        // Get/Set ChatGPT username
+        public string GetChatGptUsername()
         {
-            return GetValue(CHATGPT_API_KEY, "");
+            return GetValue(CHATGPT_USERNAME, "");
         }
 
-        public void SetChatGptApiKey(string apiKey)
+        public void SetChatGptUsername(string username)
         {
-            _configValues[CHATGPT_API_KEY] = apiKey;
+            _configValues[CHATGPT_USERNAME] = username;
             SaveConfig();
-            Console.WriteLine("ChatGPT API key updated");
+            Console.WriteLine("ChatGPT username updated");
+        }
+
+        // Get/Set ChatGPT endpoint
+        public string GetChatGptEndpoint()
+        {
+            return GetValue(CHATGPT_ENDPOINT, "");
+        }
+
+        public void SetChatGptEndpoint(string endpoint)
+        {
+            _configValues[CHATGPT_ENDPOINT] = endpoint;
+            SaveConfig();
+            Console.WriteLine("ChatGPT endpoint updated");
+        }
+
+        // Get/Set ChatGPT password
+        public string GetChatGptPassword()
+        {
+            return GetValue(CHATGPT_PASSWORD, "");
+        }
+
+        public void SetChatGptPassword(string password)
+        {
+            _configValues[CHATGPT_PASSWORD] = password;
+            SaveConfig();
+            Console.WriteLine("ChatGPT password updated");
         }
 
         // Get/Set ChatGPT model
@@ -1552,9 +1503,6 @@ namespace ScreenTranslation
                 case "ChatGPT":
                     keysConfigKey = CHATGPT_API_KEYS;
                     break;
-                case "Google Translate":
-                    keysConfigKey = GOOGLE_TRANSLATE_API_KEYS;
-                    break;
                 default:
                     return result;
             }
@@ -1579,9 +1527,6 @@ namespace ScreenTranslation
             {
                 case "ChatGPT":
                     keysConfigKey = CHATGPT_API_KEYS;
-                    break;
-                case "Google Translate":
-                    keysConfigKey = GOOGLE_TRANSLATE_API_KEYS;
                     break;
                 default:
                     return;
@@ -1633,9 +1578,7 @@ namespace ScreenTranslation
             switch (serviceType)
             {
                 case "ChatGPT":
-                    return CHATGPT_API_KEY;
-                case "Google Translate":
-                    return GOOGLE_TRANSLATE_API_KEY;
+                    return CHATGPT_USERNAME;
                 default:
                     return "";
             }
@@ -1849,17 +1792,6 @@ namespace ScreenTranslation
                     break;
                 }
             }
-        }
-        public string GetGoogleTranslateApiKey()
-        {
-            return GetValue(GOOGLE_TRANSLATE_API_KEY, "");
-        }
-
-        public void SetGoogleTranslateApiKey(string apiKey)
-        {
-            _configValues[GOOGLE_TRANSLATE_API_KEY] = apiKey;
-            SaveConfig();
-            Console.WriteLine("Google Translate API key updated");
         }
 
         public string GetAudioProcessingProvider()

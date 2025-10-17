@@ -375,21 +375,7 @@ namespace ScreenTranslation
                     
                     try
                     {
-                        bool success = false;
-
-                        if (ttsService == "Google Cloud TTS")
-                        {
-                            success = await GoogleTTSService.Instance.SpeakText(trimmedText);
-                        }
-                        else if (ttsService == "Windows TTS")
-                        {
-                            success = await WindowsTTSService.Instance.SpeakText(trimmedText);
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Unsupported TTS service: {ttsService}");
-                            return false;
-                        }
+                        bool success = await WindowsTTSService.Instance.SpeakText(trimmedText);
 
                         if (!success)
                         {

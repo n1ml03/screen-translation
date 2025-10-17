@@ -504,126 +504,75 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
                                 <!-- Translation Service -->
                                 <TextBlock Text="Translation Service:" Grid.Row="0" Grid.Column="0" 
                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="translationServiceComboBox" Grid.Row="0" Grid.Column="1" 
+                                <ComboBox x:Name="translationServiceComboBox" Grid.Row="0" Grid.Column="1"
                                          Margin="0,5" SelectedIndex="0" SelectionChanged="TranslationServiceComboBox_SelectionChanged">
                                     <ComboBoxItem Content="ChatGPT"/>
-                                    <ComboBoxItem Content="Google Translate"/>
                                 </ComboBox>
-                                <!-- ChatGPT API Key - Only visible when ChatGPT is selected -->
-                                <TextBlock x:Name="chatGptApiKeyLabel" Text="ChatGPT API Key:" Grid.Row="1" Grid.Column="0" 
+                                <!-- ChatGPT Credentials - Only visible when ChatGPT is selected -->
+                                <TextBlock x:Name="chatGptUsernameLabel" Text="Username:" Grid.Row="1" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0" Visibility="Collapsed"/>
+                                <TextBox x:Name="chatGptUsernameTextBox" Grid.Row="1" Grid.Column="1"
+                                         Margin="0,5" Visibility="Collapsed"
+                                         TextChanged="ChatGptUsernameTextBox_TextChanged"/>
+
+                                <TextBlock x:Name="chatGptEndpointLabel" Text="Base Endpoint:" Grid.Row="2" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0" Visibility="Collapsed"
+                                          ToolTip="Base endpoint URL that will be combined with /v1/{model} for the full endpoint"/>
+                                <TextBox x:Name="chatGptEndpointTextBox" Grid.Row="2" Grid.Column="1"
+                                         Margin="0,5" Visibility="Collapsed"
+                                         TextChanged="ChatGptEndpointTextBox_TextChanged"
+                                         ToolTip="Example: www.chatqa.asd.local (will become www.chatqa.asd.local/v1/gpt-41-nano)"/>
+
+                                <TextBlock x:Name="chatGptPasswordLabel" Text="Password:" Grid.Row="3" Grid.Column="0"
                                           VerticalAlignment="Top" Margin="0,8,10,0" Visibility="Collapsed"/>
-                                <Grid Grid.Row="1" Grid.Column="1" Visibility="Collapsed" x:Name="chatGptApiKeyGrid" Margin="0,5,0,0">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <PasswordBox x:Name="chatGptApiKeyPasswordBox" Grid.Row="0"
-                                             VerticalAlignment="Top" Margin="0,0,0,2" 
-                                             PasswordChanged="ChatGptApiKeyPasswordBox_PasswordChanged" KeyDown="ApiKeyPasswordBox_KeyDown"
-                                             Tag="ChatGPT"/>
-                                    <Button x:Name="viewChatGptKeysButton" Content="View Keys" Grid.Row="1" HorizontalAlignment="Right"
-                                             Click="ViewApiKeysButton_Click" Tag="ChatGPT" Width="70"/>
-                                    <TextBlock x:Name="chatGptNote" Text="Press Enter after entering each API key" Grid.Row="1" TextWrapping="Wrap" 
-                                        Margin="0,2,0,5" FontSize="11" HorizontalAlignment="Left" FontWeight="Bold">
-                                    </TextBlock>
-                                    <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,2,0,5" FontSize="11">
-                                        <Run>Get API key from </Run>
-                                        <Hyperlink Click="ChatGptApiLink_Click">https://platform.openai.com/api-keys</Hyperlink>
-                                    </TextBlock>
-                                </Grid>
+                                <PasswordBox x:Name="chatGptPasswordBox" Grid.Row="3" Grid.Column="1"
+                                             Margin="0,5" Visibility="Collapsed"
+                                             PasswordChanged="ChatGptPasswordBox_PasswordChanged"/>
                                 
                                 <!-- ChatGPT Model - Only visible when ChatGPT is selected -->
-                                <TextBlock x:Name="chatGptModelLabel" Text="ChatGPT Model:" Grid.Row="3" Grid.Column="0" 
+                                <TextBlock x:Name="chatGptModelLabel" Text="ChatGPT Model:" Grid.Row="4" Grid.Column="0"
                                           VerticalAlignment="Center" Margin="0,5,10,0" Visibility="Collapsed"
-                                          ToolTip="The OpenAI model to use for translation"/>
-                                <Grid Grid.Row="3" Grid.Column="1" Margin="0,5" Visibility="Collapsed" x:Name="chatGptModelGrid">
+                                          ToolTip="The model to use for translation"/>
+                                <Grid Grid.Row="4" Grid.Column="1" Margin="0,5" Visibility="Collapsed" x:Name="chatGptModelGrid">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <ComboBox x:Name="chatGptModelComboBox" Grid.Column="0"
                                             SelectionChanged="ChatGptModelComboBox_SelectionChanged">
-                                        <ComboBoxItem Content="GPT-3.5 Turbo" Tag="gpt-3.5-turbo"/>
-                                        <ComboBoxItem Content="GPT-4o Mini" Tag="gpt-4o-mini"/>
-                                        <ComboBoxItem Content="GPT-4o" Tag="gpt-4o"/>
-                                        <ComboBoxItem Content="O4 Mini" Tag="o4-mini"/>
-                                        <ComboBoxItem Content="GPT-4.1" Tag="gpt-4.1"/>
-                                        <ComboBoxItem Content="GPT-4.1 Nano" Tag="gpt-4.1-nano"/>
-                                        <ComboBoxItem Content="GPT-4.1 Mini" Tag="gpt-4.1-mini"/>
-                                        <ComboBoxItem Content="GPT-4.5 Preview" Tag="gpt-4.5-preview"/>
-                                        <ComboBoxItem Content="O3" Tag="o3"/>
-                                        <ComboBoxItem Content="O3 Mini" Tag="o3-mini"/>
+                                        <ComboBoxItem Content="GPT-41 Nano" Tag="gpt-41-nano"/>
+                                        <ComboBoxItem Content="GPT-41 Mini" Tag="gpt-41-mini"/>
+                                        <ComboBoxItem Content="GPT-41" Tag="gpt-41"/>
                                     </ComboBox>
                                     <Button x:Name="viewChatGptModelsButton" Content="View Models" Grid.Column="1"
                                            Margin="5,0,0,0" Padding="5,0" Click="ViewChatGptModelsButton_Click"
                                            ToolTip="Open OpenAI models documentation in browser"/>
                                 </Grid>
                                 
-                                <!-- Google Translate API Key - Only visible when Google Translate is selected -->
-                                <TextBlock x:Name="googleTranslateApiKeyLabel" Text="Google Cloud API Key:" Grid.Row="1" Grid.Column="0" 
-                                          VerticalAlignment="Top" Margin="0,8,10,0" Visibility="Collapsed"/>
-                                <Grid Grid.Row="1" Grid.Column="1" Visibility="Collapsed" x:Name="googleTranslateApiKeyGrid" Margin="0,5,0,0">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <PasswordBox x:Name="googleTranslateApiKeyPasswordBox" Grid.Row="0"
-                                             VerticalAlignment="Top" Margin="0,0,0,2" 
-                                             PasswordChanged="GoogleTranslateApiKeyPasswordBox_PasswordChanged" KeyDown="ApiKeyPasswordBox_KeyDown"
-                                             Tag="Google Translate"/>
-                                    <Button x:Name="viewGoogleTranslateKeysButton" Content="View Keys" Grid.Row="1" 
-                                             Click="ViewApiKeysButton_Click" Tag="Google Translate" Width="70" Visibility="Collapsed"/>
-                                    <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,2,0,5" FontSize="11">
-                                        <Run>Get API key from </Run>
-                                        <Hyperlink Click="GoogleTranslateApiLink_Click">https://cloud.google.com/translate/docs/setup</Hyperlink>
-                                    </TextBlock>
-                                </Grid>
-
-                                <!-- Google Translate Service Type - Only visible when Google Translate is selected -->
-                                <TextBlock x:Name="googleTranslateServiceTypeLabel" Text="Google Translate Service:" Grid.Row="2" Grid.Column="0" 
-                                          VerticalAlignment="Center" Margin="0,5,10,0" Visibility="Collapsed"
-                                          ToolTip="Choose between cloud API (paid) or free web service"/>
-                                <ComboBox x:Name="googleTranslateServiceTypeComboBox" Grid.Row="2" Grid.Column="1" 
-                                         Margin="0,5" Visibility="Collapsed" SelectionChanged="GoogleTranslateServiceTypeComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Free Web Service"/>
-                                    <ComboBoxItem Content="Cloud API (paid)"/>
-                                </ComboBox>
-                                
-                                <!-- Google Translate Language Mapping -->
-                                <TextBlock x:Name="googleTranslateMappingLabel" Text="Language Mapping:" Grid.Row="3" Grid.Column="0" 
-                                          VerticalAlignment="Center" Margin="0,5,10,0" Visibility="Collapsed"
-                                          ToolTip="OCR and Google Translate use different language codes. This automatically maps between them."/>
-                                <CheckBox x:Name="googleTranslateMappingCheckBox" Grid.Row="3" Grid.Column="1" 
-                                         Margin="0,5" IsChecked="True" Content="Auto-map language codes" Visibility="Collapsed"
-                                         Checked="GoogleTranslateMappingCheckBox_CheckedChanged" 
-                                         Unchecked="GoogleTranslateMappingCheckBox_CheckedChanged"
-                                         ToolTip="OCR and Google Translate use different language codes. This automatically maps between them."/>
-                                
                                 <!-- Prompt Label -->
-                                <TextBlock x:Name="promptLabel" Text="Prompt Template:" Grid.Row="4" Grid.Column="0" 
+                                <TextBlock x:Name="promptLabel" Text="Prompt Template:" Grid.Row="5" Grid.Column="0"
                                           VerticalAlignment="Top" Margin="0,10,10,0"/>
-                                
+
                                 <!-- Prompt Editor -->
-                                <TextBox x:Name="promptTemplateTextBox" Grid.Row="4" Grid.Column="1" 
+                                <TextBox x:Name="promptTemplateTextBox" Grid.Row="5" Grid.Column="1"
                                         Margin="0,10,0,0" AcceptsReturn="True" TextWrapping="Wrap"
                                         MinHeight="150" MaxHeight="300" VerticalScrollBarVisibility="Auto"
-                                        FontFamily="Consolas" FontSize="12" 
+                                        FontFamily="Consolas" FontSize="12"
                                         LostFocus="PromptTemplateTextBox_LostFocus"/>
-                                
+
                                 <!-- Save Button -->
-                                <Button x:Name="savePromptButton" Content="Save Prompt" Grid.Row="5" Grid.Column="1"
+                                <Button x:Name="savePromptButton" Content="Save Prompt" Grid.Row="6" Grid.Column="1"
                                        HorizontalAlignment="Right" Margin="0,10,0,0" Padding="10,5"
                                        Click="SavePromptButton_Click"/>
 
                                 <!-- Restore Default Prompt Button -->
-                                <Button x:Name="restoreDefaultPromptButton" Content="Restore Default Prompt" Grid.Row="5" Grid.Column="1"
+                                <Button x:Name="restoreDefaultPromptButton" Content="Restore Default Prompt" Grid.Row="6" Grid.Column="1"
                                        HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5"
                                        Click="RestoreDefaultPromptButton_Click"/>
                             </Grid>
@@ -670,9 +619,8 @@
                                 <!-- TTS Service -->
                                 <TextBlock Text="TTS Service:" Grid.Row="1" Grid.Column="0" 
                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="ttsServiceComboBox" Grid.Row="1" Grid.Column="1" 
+                                <ComboBox x:Name="ttsServiceComboBox" Grid.Row="1" Grid.Column="1"
                                          Margin="0,5" SelectedIndex="0" SelectionChanged="TtsServiceComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Google Cloud TTS"/>
                                     <ComboBoxItem Content="Windows TTS"/>
                                 </ComboBox>
                                 <!-- Windows TTS Voice - Only visible when Windows TTS is selected -->
@@ -736,66 +684,7 @@
                                             4. For voice languages not available in the list, please select the Multilingual voices in the combo box. These voices can speak multiple languages in addition to their main language.
                                         </TextBlock>
                                     </Grid>
-                                </GroupBox>
-                                
-                                <!-- Google TTS API Key - Only visible when Google TTS is selected -->
-                                <TextBlock x:Name="googleTtsApiKeyLabel" Text="Google API Key:" Grid.Row="2" Grid.Column="0" 
-                                          VerticalAlignment="Top" Margin="0,8,10,0" Visibility="Collapsed"/>
-                                <Grid Grid.Row="2" Grid.Column="1" Visibility="Collapsed" x:Name="googleTtsApiKeyGrid" Margin="0,5,0,0">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <PasswordBox x:Name="googleTtsApiKeyPasswordBox" Grid.Row="0"
-                                             VerticalAlignment="Top" Margin="0,0,0,2" 
-                                             PasswordChanged="GoogleTtsApiKeyPasswordBox_PasswordChanged"/>
-                                    <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,2,0,5" FontSize="11">
-                                        <Run>Get API key from </Run>
-                                        <Hyperlink Click="GoogleTtsApiLink_Click">https://cloud.google.com/text-to-speech</Hyperlink>
-                                        <Run> (free tier: 4M chars/month)</Run>
-                                    </TextBlock>
-                                </Grid>
-                                
-                                <!-- Google TTS Voice - Only visible when Google TTS is selected -->
-                                <TextBlock x:Name="googleTtsVoiceLabel" Text="Google Voice:" Grid.Row="3" Grid.Column="0" 
-                                          VerticalAlignment="Center" Margin="0,5,10,0" Visibility="Collapsed"/>
-                                <ComboBox x:Name="googleTtsVoiceComboBox" Grid.Row="3" Grid.Column="1" 
-                                         Margin="0,5" SelectionChanged="GoogleTtsVoiceComboBox_SelectionChanged" Visibility="Collapsed">
-                                    <!-- Japanese Voices -->
-                                    <ComboBoxItem Content="Japanese (Female) - Neural2" Tag="ja-JP-Neural2-B"/>
-                                    <ComboBoxItem Content="Japanese (Male) - Neural2" Tag="ja-JP-Neural2-C"/>
-                                    <ComboBoxItem Content="Japanese (Male Deep) - Neural2" Tag="ja-JP-Neural2-D"/>
-                                    
-                                    <!-- English Voices -->
-                                    <ComboBoxItem Content="English US (Female) - Studio" Tag="en-US-Studio-O"/>
-                                    <ComboBoxItem Content="English US (Male) - Studio" Tag="en-US-Studio-M"/>
-                                    <ComboBoxItem Content="English UK (Female) - Neural2" Tag="en-GB-Neural2-F"/>
-                                    
-                                    <!-- French Voices -->
-                                    <ComboBoxItem Content="French (Female) - Neural2" Tag="fr-FR-Neural2-A"/>
-                                    <ComboBoxItem Content="French (Male) - Neural2" Tag="fr-FR-Neural2-D"/>
-                                    
-                                    <!-- German Voices -->
-                                    <ComboBoxItem Content="German (Female) - Neural2" Tag="de-DE-Neural2-F"/>
-                                    <ComboBoxItem Content="German (Male) - Neural2" Tag="de-DE-Neural2-B"/>
-                                    
-                                    <!-- Spanish Voices -->
-                                    <ComboBoxItem Content="Spanish (Female) - Neural2" Tag="es-ES-Neural2-F"/>
-                                    <ComboBoxItem Content="Spanish (Male) - Neural2" Tag="es-ES-Neural2-C"/>
-                                    
-                                    <!-- Korean Voices -->
-                                    <ComboBoxItem Content="Korean (Female) - Neural2" Tag="ko-KR-Neural2-A"/>
-                                    <ComboBoxItem Content="Korean (Male) - Neural2" Tag="ko-KR-Neural2-C"/>
-                                    
-                                    <!-- Chinese Voices -->
-                                    <ComboBoxItem Content="Chinese (Female) - Neural2" Tag="cmn-CN-Neural2-A"/>
-                                    <ComboBoxItem Content="Chinese (Male) - Neural2" Tag="cmn-CN-Neural2-C"/>
-                                    
-                                    <!-- Vietnamese Voices -->
-                                    <ComboBoxItem Content="Vietnamese (Female) - Neural2" Tag="vi-VN-Neural2-A"/>
-                                    <ComboBoxItem Content="Vietnamese (Male) - Neural2" Tag="vi-VN-Neural2-D"/>
-                                </ComboBox>
-                            </Grid>
+                                </GroupBox>                            </Grid>
                         </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
@@ -950,7 +839,7 @@
                                 <TextBlock Text="OpenAI API Key:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <PasswordBox x:Name="openAiRealtimeApiKeyPasswordBox" Grid.Row="1" Grid.Column="1" Margin="0,5" PasswordChanged="OpenAiRealtimeApiKeyPasswordBox_PasswordChanged"/>
                                 <CheckBox x:Name="audioServiceAutoTranslateCheckBox" Grid.Row="2" Grid.Column="1" Margin="0,5"
-                                         Content="Auto translate (using Google Translate)" 
+                                         Content="Auto translate (using ChatGPT)"
                                          Checked="AudioServiceAutoTranslateCheckBox_CheckedChanged"
                                          Unchecked="AudioServiceAutoTranslateCheckBox_CheckedChanged"/>
                             </Grid>

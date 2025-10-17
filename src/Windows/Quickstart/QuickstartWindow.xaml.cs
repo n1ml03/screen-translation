@@ -289,33 +289,29 @@ namespace ScreenTranslation
 
             // Populate translation service dropdown
             TranslationServiceComboBox.Items.Clear();
-            TranslationServiceComboBox.Items.Add("Google Translate");
             TranslationServiceComboBox.Items.Add("ChatGPT");
 
             // Set current selection
             switch (translationService.ToLower())
             {
-                case "google translate":
-                    TranslationServiceComboBox.SelectedItem = "Google Translate";
-                    break;
                 case "chatgpt":
                     TranslationServiceComboBox.SelectedItem = "ChatGPT";
                     break;
                 default:
-                    TranslationServiceComboBox.SelectedItem = "Google Translate";
+                    TranslationServiceComboBox.SelectedItem = "ChatGPT";
                     break;
             }
 
-            // Load API keys
-            GoogleTranslateApiKeyPasswordBox.Password = configManager.GetGoogleTranslateApiKey() ?? "";
-            ChatGptApiKeyPasswordBox.Password = configManager.GetChatGptApiKey() ?? "";
+            // Load credentials
+            ChatGptUsernameTextBox.Text = configManager.GetChatGptUsername() ?? "";
+            ChatGptEndpointTextBox.Text = configManager.GetChatGptEndpoint() ?? "";
+            ChatGptPasswordBox.Password = configManager.GetChatGptPassword() ?? "";
 
             // Load ChatGPT models
             ChatGptModelComboBox.Items.Clear();
-            ChatGptModelComboBox.Items.Add("gpt-3.5-turbo");
-            ChatGptModelComboBox.Items.Add("gpt-4o-mini");
-            ChatGptModelComboBox.Items.Add("gpt-4.1-nano");
-            ChatGptModelComboBox.Items.Add("gpt-4o");
+            ChatGptModelComboBox.Items.Add("gpt-41-nano");
+            ChatGptModelComboBox.Items.Add("gpt-41-mini");
+            ChatGptModelComboBox.Items.Add("gpt-41");
 
             // Set selected ChatGPT model
             string chatGptModel = configManager.GetChatGptModel();
@@ -325,7 +321,7 @@ namespace ScreenTranslation
             }
             else
             {
-                ChatGptModelComboBox.SelectedItem = "gpt-3.5-turbo";
+                ChatGptModelComboBox.SelectedItem = "gpt-41-nano";
             }
 
             // Update visibility of API key fields based on selected service
@@ -346,8 +342,7 @@ namespace ScreenTranslation
         private void UpdateApiKeyFieldsVisibility()
         {
             // Hide all API key fields
-            GoogleTranslateApiKeyPanel.Visibility = Visibility.Collapsed;
-            ChatGptApiKeyPanel.Visibility = Visibility.Collapsed;
+            ChatGptCredentialsPanel.Visibility = Visibility.Collapsed;
 
             // Show the appropriate API key field based on the selected service
             if (TranslationServiceComboBox.SelectedItem != null)
@@ -356,25 +351,27 @@ namespace ScreenTranslation
 
                 switch (selectedService)
                 {
-                    case "Google Translate":
-                        GoogleTranslateApiKeyPanel.Visibility = Visibility.Visible;
-                        break;
                     case "ChatGPT":
-                        ChatGptApiKeyPanel.Visibility = Visibility.Visible;
+                        ChatGptCredentialsPanel.Visibility = Visibility.Visible;
                         break;
                 }
             }
         }
 
-        private void GoogleTranslateApiKeyPasswordBox_PasswordChanged(object sender, System.Windows.Input.KeyEventArgs e)
+
+        private void ChatGptUsernameTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            configManager.SetGoogleTranslateApiKey(GoogleTranslateApiKeyPasswordBox.Password);
+            configManager.SetChatGptUsername(ChatGptUsernameTextBox.Text);
         }
 
-        private void ChatGptApiKeyPasswordBox_PasswordChanged(object sender, System.Windows.Input.KeyEventArgs e)
+        private void ChatGptEndpointTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            configManager.SetChatGptApiKey(ChatGptApiKeyPasswordBox.Password);
-            HandleApiKeyEnter(sender, e);
+            configManager.SetChatGptEndpoint(ChatGptEndpointTextBox.Text);
+        }
+
+        private void ChatGptPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            configManager.SetChatGptPassword(ChatGptPasswordBox.Password);
         }
 
         // Common method to handle API key Enter key press
@@ -459,14 +456,11 @@ namespace ScreenTranslation
             // Format translation service display
             switch (translationService.ToLower())
             {
-                case "googletranslate":
-                    TranslationServiceSummaryText.Text = "Google Translate";
-                    break;
                 case "chatgpt":
                     TranslationServiceSummaryText.Text = "ChatGPT";
                     break;
                 default:
-                    TranslationServiceSummaryText.Text = "Google Translate";
+                    TranslationServiceSummaryText.Text = "ChatGPT";
                     break;
             }
         }

@@ -45,22 +45,25 @@ namespace ScreenTranslation
 
         public async Task<string?> TranslateAsync(string jsonData, string prompt)
         {
-            string apiKey = ConfigManager.Instance.GetChatGptApiKey();
-            string currenServices = ConfigManager.Instance.GetCurrentTranslationService();
+            string username = ConfigManager.Instance.GetChatGptUsername();
+            string baseEndpoint = ConfigManager.Instance.GetChatGptEndpoint();
+            string password = ConfigManager.Instance.GetChatGptPassword();
+            string currentService = ConfigManager.Instance.GetCurrentTranslationService();
+
             try
             {
-                // Get API key and model from config
+                // Get model from config
                 string model = ConfigManager.Instance.GetChatGptModel();
 
-                // Validate we have an API key
-                if (string.IsNullOrWhiteSpace(apiKey))
+                // Construct full endpoint: baseEndpoint + /v1/ + model
+                string endpoint = $"{baseEndpoint.TrimEnd('/')}/v1/{model}";
+
+                // Validate we have required credentials
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(baseEndpoint) || string.IsNullOrWhiteSpace(password))
                 {
-                    Console.WriteLine("ChatGPT API key is missing. Please set it in the settings.");
+                    Console.WriteLine("ChatGPT credentials (username, endpoint, password) are missing. Please set them in the settings.");
                     return null;
                 }
-
-                // Log the original input
-                //Console.WriteLine($"ChatGPT input JSON: {jsonData}");
 
                 // Parse the input JSON
                 JsonElement inputJson = JsonSerializer.Deserialize<JsonElement>(jsonData);
@@ -68,7 +71,7 @@ namespace ScreenTranslation
                 // Get custom prompt from config
                 string customPrompt = ConfigManager.Instance.GetServicePrompt("ChatGPT");
 
-                // Build messages array for ChatGPT API
+                // Build messages array for the secret endpoint
                 var messages = new List<Dictionary<string, string>>();
 
                 // Use the exact prompt format as specified
@@ -93,24 +96,25 @@ namespace ScreenTranslation
                     { "content", "Here is the input JSON:\n\n" + jsonData }
                 });
 
-                // Create request body
+                // Create request body for secret endpoint
                 var requestBody = new Dictionary<string, object>
                 {
                     { "model", model },
                     { "messages", messages },
                     { "temperature", 0.3 },  // Lower temperature for more consistent translations
-                    { "max_tokens", 2000 }   // Increase max tokens for longer texts
+                    { "max_tokens", 2000 },  // Increase max tokens for longer texts
+                    { "username", username },
+                    { "password", password }
                 };
 
                 // Serialize the request body
                 string requestJson = JsonSerializer.Serialize(requestBody);
 
-                // Set up HTTP request
-                var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-                request.Headers.Add("Authorization", $"Bearer {apiKey}");
+                // Set up HTTP request to secret endpoint
+                var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
                 request.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-                // Send request to OpenAI API
+                // Send request to secret endpoint
                 var response = await _httpClient.SendAsync(request);
                 string responseContent = await response.Content.ReadAsStringAsync();
 
@@ -288,11 +292,10 @@ namespace ScreenTranslation
                 }
                 else
                 {
-                    Console.WriteLine($"Error calling ChatGPT API: {response.StatusCode}");
+                    Console.WriteLine($"Error calling ChatGPT secret endpoint: {response.StatusCode}");
                     Console.WriteLine($"Response: {responseContent}");
-                    string newApikey = ConfigManager.Instance.GetNextApiKey(currenServices, apiKey);
-                    ConfigManager.Instance.SetChatGptApiKey(newApikey);
-                    Console.WriteLine("Change new api key successfully");
+                    // Note: With username/password authentication, we don't automatically switch credentials
+                    // The user needs to verify their credentials are correct
                 }
 
                 return null;

@@ -759,13 +759,22 @@ namespace ScreenTranslation
             try
             {
                 // Get and log configuration values
-                string apiKey = ConfigManager.Instance.GetChatGptApiKey();
+                string username = ConfigManager.Instance.GetChatGptUsername();
+                string baseEndpoint = ConfigManager.Instance.GetChatGptEndpoint();
+                string model = ConfigManager.Instance.GetChatGptModel();
                 string llmPrompt = Logic.Instance.GetLlmPrompt();
                 string ocrMethod = ConfigManager.Instance.GetOcrMethod();
                 string translationService = ConfigManager.Instance.GetCurrentTranslationService();
-                
+
+                // Construct full endpoint like the translation service does
+                string fullEndpoint = string.IsNullOrEmpty(baseEndpoint) ? "Not set" :
+                    $"{baseEndpoint.TrimEnd('/')}/v1/{model}";
+
                 Console.WriteLine("=== Configuration Test ===");
-                Console.WriteLine($"API Key: {(string.IsNullOrEmpty(apiKey) ? "Not set" : "Set - " + apiKey.Substring(0, 4) + "...")}");
+                Console.WriteLine($"Username: {(string.IsNullOrEmpty(username) ? "Not set" : username)}");
+                Console.WriteLine($"Base Endpoint: {(string.IsNullOrEmpty(baseEndpoint) ? "Not set" : baseEndpoint)}");
+                Console.WriteLine($"Model: {model}");
+                Console.WriteLine($"Full Endpoint: {fullEndpoint}");
                 Console.WriteLine($"LLM Prompt: {(string.IsNullOrEmpty(llmPrompt) ? "Not set" : "Set - " + llmPrompt.Length + " chars")}");
                 Console.WriteLine($"OCR Method: {ocrMethod}");
                 Console.WriteLine($"Translation Service: {translationService}");

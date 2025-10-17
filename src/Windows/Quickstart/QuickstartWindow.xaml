@@ -321,10 +321,6 @@
                         Translation Service
                     </TextBlock>
 
-                    <TextBlock TextWrapping="Wrap" FontSize="14" Margin="0,0,0,20">
-                        Select a translation service to translate the recognized text.
-                    </TextBlock>
-
                     <Grid Margin="0,0,0,20">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -338,44 +334,24 @@
                         <ComboBox Grid.Row="0" Grid.Column="1" x:Name="TranslationServiceComboBox" Width="200" HorizontalAlignment="Left" SelectionChanged="TranslationServiceComboBox_SelectionChanged"/>
                     </Grid>
 
-                    <!-- Google Translate API Key -->
-                    <StackPanel x:Name="GoogleTranslateApiKeyPanel" Visibility="Collapsed" Margin="0,0,0,10">
-                        <TextBlock Text="Google Translate API Key (optional, After entering the API key, press Enter to save):" FontWeight="Bold" Margin="0,0,0,5"/>
-                        <PasswordBox x:Name="GoogleTranslateApiKeyPasswordBox" Width="300" HorizontalAlignment="Left" KeyDown="GoogleTranslateApiKeyPasswordBox_PasswordChanged"/>
-                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="LightGray" Margin="0,5,0,0">
-                            Note: Google Translate works without an API key, but using one provides better service.
-                        </TextBlock>
-                    </StackPanel>
 
-                    <!-- ChatGPT API Key -->
-                    <StackPanel x:Name="ChatGptApiKeyPanel" Visibility="Collapsed" Margin="0,0,0,10">
-                        <TextBlock Text="ChatGPT API Key (After entering the API key, press Enter to save):" FontWeight="Bold" Margin="0,0,0,5"/>
-                        <PasswordBox x:Name="ChatGptApiKeyPasswordBox" Width="300" HorizontalAlignment="Left" KeyDown="ChatGptApiKeyPasswordBox_PasswordChanged"/>
+                    <!-- ChatGPT Credentials -->
+                    <StackPanel x:Name="ChatGptCredentialsPanel" Visibility="Collapsed" Margin="0,0,0,10">
+                        <TextBlock Text="Username:" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <TextBox x:Name="ChatGptUsernameTextBox" Width="300" HorizontalAlignment="Left" TextChanged="ChatGptUsernameTextBox_TextChanged"/>
+
+                        <TextBlock Text="Base Endpoint:" FontWeight="Bold" Margin="0,10,0,5"/>
+                        <TextBox x:Name="ChatGptEndpointTextBox" Width="300" HorizontalAlignment="Left"
+                                 TextChanged="ChatGptEndpointTextBox_TextChanged"
+                                 ToolTip="Example: www.chatqa.asd.local (will become www.chatqa.asd.local/v1/gpt-41-nano based on selected model)"/>
+
+                        <TextBlock Text="Password:" FontWeight="Bold" Margin="0,10,0,5"/>
+                        <PasswordBox x:Name="ChatGptPasswordBox" Width="300" HorizontalAlignment="Left" PasswordChanged="ChatGptPasswordBox_PasswordChanged"/>
 
                         <TextBlock Text="Model:" FontWeight="Bold" Margin="0,10,0,5"/>
                         <ComboBox x:Name="ChatGptModelComboBox" Width="300" HorizontalAlignment="Left"/>
-
-                        <Button Content="Get API Key" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="8,3" Click="GetApiKey_Click" Tag="https://platform.openai.com/api-keys"/>
-
-                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="LightGray" Margin="0,5,0,0">
-                            Note: ChatGPT provides high-quality translations but requires an API key with payment method.
-                        </TextBlock>
                     </StackPanel>
 
-                    <Border Background="#252525" CornerRadius="5" Padding="15" Margin="0,10,0,20">
-                        <StackPanel>
-                            <TextBlock FontWeight="Bold" FontSize="16" Foreground="#3498db" Margin="0,0,0,10">Translation Service Recommendations:</TextBlock>
-                            <TextBlock TextWrapping="Wrap">
-                                <Run FontWeight="Bold">Speed:</Run> The translation speed depends on the LLM model, try different models to find the most suitable one.
-                            </TextBlock>
-                            <TextBlock TextWrapping="Wrap" Margin="0,5,0,0">
-                                <Run FontWeight="Bold">For beginners:</Run> Google Translate (free, no setup required)
-                            </TextBlock>
-                            <TextBlock TextWrapping="Wrap" Margin="0,5,0,0">
-                                <Run FontWeight="Bold">For best quality:</Run> ChatGPT (requires paid API key)
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
 
                 <!-- Complete Panel -->
@@ -415,7 +391,7 @@
                             <TextBlock Grid.Row="1" Grid.Column="1" x:Name="OcrMethodSummaryText" Text="Windows OCR" Margin="0,0,0,10"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Translation Service:" FontWeight="Bold" Foreground="#3498db" Margin="0,0,10,10"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TranslationServiceSummaryText" Text="Google Translate"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TranslationServiceSummaryText" Text="ChatGPT"/>
                         </Grid>
                     </Border>
 

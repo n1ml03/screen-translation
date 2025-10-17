@@ -477,26 +477,11 @@ namespace ScreenTranslation
                         
                         try
                         {
-                            bool success = false;
-                            
-                            if (ttsService == "Google Cloud TTS")
-                            {
-                                success = await GoogleTTSService.Instance.SpeakText(text);
-                            }
-                            else if (ttsService == "Windows TTS")
-                            {
-                                success = await WindowsTTSService.Instance.SpeakText(text);
-                            }
-                            else
-                            {
-                                System.Windows.MessageBox.Show($"Text-to-Speech service '{ttsService}' is not supported yet.",
-                                    "Unsupported Service", MessageBoxButton.OK, MessageBoxImage.Information);
-                                return;
-                            }
+                            bool success = await WindowsTTSService.Instance.SpeakText(text);
                             
                             if (!success)
                             {
-                                System.Windows.MessageBox.Show($"Failed to generate speech using {ttsService}. Please check the API key and settings.",
+                                System.Windows.MessageBox.Show("Failed to generate speech using Windows TTS. Please check your settings.",
                                     "Text-to-Speech Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                             }
                         }
