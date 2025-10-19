@@ -1050,7 +1050,19 @@ namespace ScreenTranslation
         // Helper method to get language code from ComboBox
         private string GetLanguageCode(ComboBox comboBox)
         {
-            return ((ComboBoxItem)comboBox.SelectedItem).Content.ToString() ?? "";
+            try
+            {
+                if (comboBox?.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    return selectedItem.Content?.ToString() ?? "";
+                }
+                return "";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting language code: {ex.Message}");
+                return "";
+            }
         }
 
         // Block detection settings
@@ -1789,7 +1801,7 @@ namespace ScreenTranslation
 
             if (sourceLanguageComboBox.SelectedItem is ComboBoxItem selectedItem)
             {
-                sourceLanguage = selectedItem.Content.ToString();
+                sourceLanguage = selectedItem.Content?.ToString();
             }
             if (string.IsNullOrEmpty(sourceLanguage))
             {

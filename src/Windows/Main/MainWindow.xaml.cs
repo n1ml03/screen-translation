@@ -1208,14 +1208,14 @@ namespace ScreenTranslation
                     // Check if we're using OneOCR
                     if (GetSelectedOcrMethod() == "OneOCR")
                     {
-                        string sourceLanguage = (sourceLanguageComboBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()!;
+                        string sourceLanguage = GetSelectedSourceLanguage() ?? "en";
                         // Save bitmap to file for OneOCR processing
                         bitmap.Save(outputPath, ImageFormat.Png);
                         Logic.Instance.ProcessWithOneOCR(outputPath, sourceLanguage);
                     }
                     else if (GetSelectedOcrMethod() != "OneOCR" & ConfigManager.Instance.IsOneOCRIntegrationEnabled())
                     {
-                        string sourceLanguage = (sourceLanguageComboBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()!;
+                        string sourceLanguage = GetSelectedSourceLanguage() ?? "en";
                         bitmap.Save(outputPath, ImageFormat.Png);
                         Logic.Instance.ProcessWithOneOCRIntegration(bitmap, sourceLanguage, outputPath);
                     }
@@ -1261,6 +1261,23 @@ namespace ScreenTranslation
 
 
         // Reset OCR hash when language selection changes
+        private string? GetSelectedSourceLanguage()
+        {
+            try
+            {
+                if (sourceLanguageComboBox?.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    return selectedItem.Content?.ToString();
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting selected source language: {ex.Message}");
+                return null;
+            }
+        }
+
         private void SourceLanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             // Skip saving during initialization

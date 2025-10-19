@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ScreenTranslation"
         mc:Ignorable="d"
-        Title="Translation History" 
+        Title="Recent Texts" 
         Height="300" Width="400"
         Topmost="True"
         AllowsTransparency="True"
@@ -108,77 +108,108 @@
     </Window.Resources>
     
     <Grid>
-        <!-- Header/title bar - always has minimum opacity -->
-        <Border x:Name="headerBar" Height="28" VerticalAlignment="Top" Background="#CC202020" 
-                MouseLeftButtonDown="Header_MouseLeftButtonDown" 
+        <!-- Modern header/title bar with enhanced design -->
+        <Border x:Name="headerBar" Height="42" VerticalAlignment="Top" Background="#E6202020"
+                MouseLeftButtonDown="Header_MouseLeftButtonDown"
                 Panel.ZIndex="1"
-                CornerRadius="0,0,0,0">
-            <DockPanel LastChildFill="True">
-                <Button Content="X" Width="28" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource CloseButtonStyle}"
-                        Click="CloseButton_Click"
-                        ToolTip="Close window"/>
-                <Button x:Name="fontIncreaseButton" Content="+" Width="28" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        Click="FontIncreaseButton_Click"
-                        ToolTip="Increase font size"/>
-                <Button x:Name="fontDecreaseButton" Content="-" Width="28" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        Click="FontDecreaseButton_Click"
-                        ToolTip="Decrease font size"/>
-                <Button x:Name="clearButton" Content="Clear" Width="50" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        Click="ClearButton_Click"
-                        ToolTip="Clear translation history"/>
-                <Button x:Name="modeButton" Content="Translated Text" Width="Auto" MinWidth="50" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        Click="ModeButton_Click"
-                        ToolTip="Toggle between showing both languages or only the translate/source text"/>
-                <Button x:Name="optionsButton" Content="Options" Width="60" Height="28" 
-                        DockPanel.Dock="Right"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        Click="OptionsButton_Click"
-                        ToolTip="Configure appearance settings"/>
-                <TextBlock Text="Recent Text" Foreground="White" 
-                           VerticalAlignment="Center" Margin="10,0" FontWeight="SemiBold"/>
-            </DockPanel>
+                CornerRadius="0,0,0,0"
+                BorderThickness="0,0,0,1"
+                BorderBrush="#33FFFFFF">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="#000000"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left side - Title with icon -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="15,0,0,0">
+                    <TextBlock Text="💬" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Recent Text" Foreground="White"
+                               VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16"/>
+                </StackPanel>
+
+                <!-- Center - Status indicator -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="entryCountText" Text="0 entries" Foreground="#CCCCCC"
+                               FontSize="12" VerticalAlignment="Center" FontStyle="Italic"/>
+                </StackPanel>
+
+                <!-- Right side - Control buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,5,0">
+                    <Button x:Name="optionsButton" Content="⚙" Width="32" Height="32"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="OptionsButton_Click"
+                            ToolTip="Configure appearance settings"
+                            FontSize="14"/>
+                    <Button x:Name="modeButton" Content="🌐" Width="80" Height="32"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="ModeButton_Click"
+                            ToolTip="Toggle between showing both languages or only the translate/source text"
+                            FontSize="11" HorizontalContentAlignment="Center"/>
+                    <Button x:Name="fontDecreaseButton" Content="🔍-" Width="32" Height="32"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="FontDecreaseButton_Click"
+                            ToolTip="Decrease font size"/>
+                    <Button x:Name="fontIncreaseButton" Content="🔍+" Width="32" Height="32"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="FontIncreaseButton_Click"
+                            ToolTip="Increase font size"/>
+                    <Button x:Name="clearButton" Content="🗑" Width="32" Height="32"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            Click="ClearButton_Click"
+                            ToolTip="Clear translation history"/>
+                    <Button Content="✕" Width="32" Height="32"
+                            Style="{StaticResource CloseButtonStyle}"
+                            Click="CloseButton_Click"
+                            ToolTip="Close window"/>
+                </StackPanel>
+            </Grid>
         </Border>
         
-        <!-- Wrap RichTextBox in a ScrollViewer with better scrollbar placement -->
-        <ScrollViewer x:Name="chatScrollViewer" 
-                      Margin="0,28,0,30" 
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled"
-                      Background="#30000000"
-                      Padding="0">
-            <ScrollViewer.Resources>
-                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CustomScrollBarStyle}"/>
-            </ScrollViewer.Resources>
-            <RichTextBox x:Name="chatHistoryText" 
-                         Background="Transparent"
-                         BorderThickness="0"
-                         IsReadOnly="True"
-                         VerticalScrollBarVisibility="Disabled"
-                         HorizontalScrollBarVisibility="Disabled"
-                         Padding="10,10,10,10"
-                         Margin="0,0,0,0"
-                         AcceptsReturn="True"
-                         IsDocumentEnabled="True"
-                         FontFamily="Segoe UI"
-                         FontSize="14"
-                         Foreground="White"
-                         Block.LineHeight="Auto"/>
-        </ScrollViewer>
+        <!-- Enhanced content area with modern design -->
+        <Border Margin="0,42,0,35" Background="#1A000000" CornerRadius="0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="1" ShadowDepth="0" Opacity="0.1" Color="#FFFFFF"/>
+            </Border.Effect>
+
+            <ScrollViewer x:Name="chatScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Background="Transparent"
+                          Padding="0">
+                <ScrollViewer.Resources>
+                    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource CustomScrollBarStyle}"/>
+                </ScrollViewer.Resources>
+
+                <!-- Content wrapper with improved padding -->
+                <Border Background="Transparent" Padding="20,15,20,20" MinHeight="100">
+                    <RichTextBox x:Name="chatHistoryText"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 IsReadOnly="True"
+                                 VerticalScrollBarVisibility="Disabled"
+                                 HorizontalScrollBarVisibility="Disabled"
+                                 Padding="0"
+                                 Margin="0"
+                                 AcceptsReturn="True"
+                                 IsDocumentEnabled="True"
+                                 FontFamily="Segoe UI"
+                                 FontSize="16"
+                                 Foreground="White"
+                                 Block.LineHeight="1.4"
+                                 TextOptions.TextFormattingMode="Display"/>
+                </Border>
+            </ScrollViewer>
+        </Border>
         
         <!-- Translation in progress indicator -->
-        <Border x:Name="translationStatusPanel" 
-                Height="30" 
-                VerticalAlignment="Bottom" 
+        <Border x:Name="translationStatusPanel"
+                Height="35"
+                VerticalAlignment="Bottom"
                 HorizontalAlignment="Stretch"
                 Background="#DD202020"
                 BorderThickness="0,1,0,0"
@@ -187,71 +218,78 @@
                 Visibility="Collapsed"
                 Panel.ZIndex="2">
             <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock x:Name="translationStatusText" 
-                               Text="Waiting for translation..."
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Service icon -->
+                <TextBlock x:Name="serviceIcon"
+                           Grid.Column="0"
+                           Text="🔄"
+                           FontSize="14"
+                           VerticalAlignment="Center"
+                           Margin="10,0,5,0"
+                           Foreground="#FFD700"/>
+
+                <!-- Status text and progress -->
+                <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center" Margin="0,2">
+                    <TextBlock x:Name="translationStatusText"
+                               Text="Translating with Google Translate..."
                                Foreground="White"
                                FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Margin="0,0,10,0"/>
-                    <!-- Loading animation dots với XAML animation -->
-                    <Canvas x:Name="loadingCanvas" Width="30" Height="10">
-                        <Ellipse x:Name="dot1" Width="6" Height="6" Fill="White" Canvas.Left="0" Canvas.Top="2" Opacity="1">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Style.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever">
-                                                    <DoubleAnimation 
-                                                        Storyboard.TargetProperty="Opacity"
-                                                        From="1" To="0.3" Duration="0:0:0.6" 
-                                                        AutoReverse="True" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <Ellipse x:Name="dot2" Width="6" Height="6" Fill="White" Canvas.Left="12" Canvas.Top="2" Opacity="0.6">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Style.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever" BeginTime="0:0:0.2">
-                                                    <DoubleAnimation 
-                                                        Storyboard.TargetProperty="Opacity"
-                                                        From="1" To="0.3" Duration="0:0:0.6" 
-                                                        AutoReverse="True" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <Ellipse x:Name="dot3" Width="6" Height="6" Fill="White" Canvas.Left="24" Canvas.Top="2" Opacity="0.3">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Style.Triggers>
-                                        <EventTrigger RoutedEvent="Loaded">
-                                            <BeginStoryboard>
-                                                <Storyboard RepeatBehavior="Forever" BeginTime="0:0:0.4">
-                                                    <DoubleAnimation 
-                                                        Storyboard.TargetProperty="Opacity"
-                                                        From="1" To="0.3" Duration="0:0:0.6" 
-                                                        AutoReverse="True" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                    </Canvas>
+                               FontSize="14"
+                               VerticalAlignment="Center"/>
+                    <ProgressBar x:Name="translationProgressBar"
+                                 Height="3"
+                                 MinWidth="100"
+                                 MaxWidth="300"
+                                 IsIndeterminate="True"
+                                 Background="#33FFFFFF"
+                                 Foreground="#FF4CAF50"
+                                 Margin="0,2,0,0"
+                                 HorizontalAlignment="Left"/>
                 </StackPanel>
+
+                <!-- Cancel button -->
+                <Button x:Name="cancelTranslationButton"
+                        Grid.Column="2"
+                        Content="✕"
+                        Width="20"
+                        Height="20"
+                        Margin="5,0,10,0"
+                        Background="Transparent"
+                        Foreground="#FFAAAAAA"
+                        BorderThickness="0"
+                        FontSize="10"
+                        FontWeight="Bold"
+                        ToolTip="Cancel translation"
+                        Click="CancelTranslationButton_Click"
+                        VerticalAlignment="Center">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="2">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#22FF4444"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </Grid>
         </Border>
         

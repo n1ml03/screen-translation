@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Web;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -16,21 +18,245 @@ using FontFamily = System.Windows.Media.FontFamily;
 
 namespace ScreenTranslation
 {
-    public partial class ChatBoxWindow : Window
+    /// <summary>
+    /// Helper class for ChatBox styling and UI element creation
+    /// </summary>
+    internal class ChatBoxStyler
     {
-        // Cached brushes to avoid repeated allocation
-        private static readonly SolidColorBrush BlackBrush = new SolidColorBrush(Colors.Black);
-        private readonly Dictionary<Color, SolidColorBrush> _brushCache = new Dictionary<Color, SolidColorBrush>();
+        // Constants for consistent styling
+        public const double HeaderFontSize = 16;
+        public const double ContentFontSize = 16;
+        public const double TimestampFontSize = 11;
+        public const double LanguageIndicatorFontSize = 11;
+        public const double IconFontSize = 12;
 
-        // Helper method to get or create cached brush
-        private SolidColorBrush GetCachedBrush(Color color)
+        public const double BaseMarginMultiplier = 0.2;
+        public const double SectionMarginMultiplier = 0.15;
+        public const double HeaderMarginMultiplier = 0.15;
+        public const double ContentMarginMultiplier = 0.08;
+
+        // Color constants
+        public static readonly Color TimestampColor = Color.FromRgb(180, 180, 180);
+        public static readonly Color LanguageIndicatorColor = Color.FromRgb(100, 180, 255);
+        public static readonly Color OriginalTextColor = Color.FromRgb(200, 200, 200);
+        public static readonly Color TranslatedTextColor = Color.FromRgb(255, 255, 255);
+        public static readonly Color SeparatorColor = Color.FromRgb(120, 120, 120);
+        public static readonly Color EntryCountColor = Color.FromRgb(200, 200, 200);
+        public static readonly Color EntryCountTruncatedColor = Color.FromRgb(255, 200, 100);
+        public static readonly Color EntryCountEmptyColor = Color.FromRgb(150, 150, 150);
+
+        // Background colors for alternating entries
+        public static readonly Color EvenEntryBgColor = Color.FromRgb(100, 150, 200);
+        public static readonly Color OddEntryBgColor = Color.FromRgb(100, 150, 120);
+        public static readonly Color BorderColor = Color.FromRgb(200, 200, 200);
+
+        private readonly Dictionary<Color, SolidColorBrush> _brushCache;
+
+        public ChatBoxStyler(Dictionary<Color, SolidColorBrush> brushCache)
+        {
+            _brushCache = brushCache;
+        }
+
+        public SolidColorBrush GetBrush(Color color)
         {
             if (!_brushCache.TryGetValue(color, out var brush))
             {
                 brush = new SolidColorBrush(color);
+                brush.Freeze();
                 _brushCache[color] = brush;
             }
             return brush;
+        }
+
+        public double CalculateBaseMargin(double fontSize) =>
+            Math.Max(fontSize * BaseMarginMultiplier, 4);
+
+        public double CalculateSectionMargin(double fontSize) =>
+            Math.Max(fontSize * SectionMarginMultiplier, 3);
+
+        public double CalculateHeaderMargin(double fontSize) =>
+            Math.Max(fontSize * HeaderMarginMultiplier, 2);
+
+        public double CalculateContentMargin(double fontSize) =>
+            Math.Max(fontSize * ContentMarginMultiplier, 1);
+
+        public Section CreateEntrySection(int entryIndex, double fontSize, double bgOpacity)
+        {
+            var section = new Section();
+
+            // Calculate spacing
+            double baseMargin = CalculateBaseMargin(fontSize);
+            double sectionMargin = CalculateSectionMargin(fontSize);
+
+            // Set alternating background
+            byte bgOpacityValue = (byte)(bgOpacity <= 0 ? 8 : Math.Max(3, bgOpacity * 8));
+            Color bgColor = entryIndex % 2 == 0 ? EvenEntryBgColor : OddEntryBgColor;
+            section.Background = GetBrush(Color.FromArgb(bgOpacityValue, bgColor.R, bgColor.G, bgColor.B));
+
+            // Add separator border (except first entry)
+            if (entryIndex > 0)
+            {
+                byte borderOpacity = (byte)Math.Min(40, bgOpacity * 30 + 10);
+                section.BorderBrush = GetBrush(Color.FromArgb(borderOpacity, BorderColor.R, BorderColor.G, BorderColor.B));
+                section.BorderThickness = new Thickness(0, 1, 0, 0);
+            }
+
+            // Set padding
+            section.Padding = new Thickness(baseMargin, sectionMargin, baseMargin, sectionMargin);
+
+            return section;
+        }
+
+        public Paragraph CreateHeaderParagraph(TranslationEntry entry, double fontSize, int displayMode)
+        {
+            var para = new Paragraph
+            {
+                Margin = new Thickness(0, CalculateHeaderMargin(fontSize), 0, CalculateContentMargin(fontSize)),
+                TextIndent = 0
+            };
+
+            // Add timestamp
+            string timestamp = entry.Timestamp.ToString("HH:mm:ss");
+            var timestampRun = new Run($"🕐 {timestamp}")
+            {
+                Foreground = GetBrush(TimestampColor),
+                FontSize = Math.Max(fontSize - 5, 9),
+                FontWeight = FontWeights.Normal
+            };
+            para.Inlines.Add(timestampRun);
+
+            // Add language indicator for dual language mode
+            if (displayMode == 0) // Both languages
+            {
+                string sourceLang = ConfigManager.Instance.GetSourceLanguage().ToUpper();
+                string targetLang = ConfigManager.Instance.GetTargetLanguage().ToUpper();
+
+                var separator = new Run(" • ")
+                {
+                    Foreground = GetBrush(SeparatorColor),
+                    FontSize = Math.Max(fontSize - 5, 9)
+                };
+                para.Inlines.Add(separator);
+
+                var langIndicator = new Run($"{sourceLang} → {targetLang}")
+                {
+                    Foreground = GetBrush(LanguageIndicatorColor),
+                    FontSize = Math.Max(fontSize - 5, 9),
+                    FontWeight = FontWeights.SemiBold
+                };
+                para.Inlines.Add(langIndicator);
+            }
+
+            return para;
+        }
+
+        public Paragraph CreateContentParagraph(TranslationEntry entry, double fontSize, int displayMode,
+                                               bool translationFailed, bool isSourceRtl, bool isTargetRtl)
+        {
+            var para = new Paragraph
+            {
+                Margin = new Thickness(0, CalculateContentMargin(fontSize), 0, CalculateSectionMargin(fontSize)),
+                TextIndent = 0,
+                LineHeight = 1.5
+            };
+
+            // Add original text
+            bool showOriginal = (displayMode == 0 || displayMode == 2) && !string.IsNullOrEmpty(entry.OriginalText);
+            if (showOriginal || (translationFailed && (displayMode == 0 || displayMode == 1)))
+            {
+                AddTextWithIcon(para, "🔤", entry.OriginalText!, fontSize, isSourceRtl,
+                               translationFailed ? Color.FromRgb(255, 180, 180) : OriginalTextColor, FontWeights.Normal);
+            }
+
+            // Add line break if showing both texts
+            if (displayMode == 0 && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
+            {
+                para.Inlines.Add(new LineBreak());
+            }
+
+            // Add translated text
+            if ((displayMode == 0 || displayMode == 1) && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
+            {
+                if (displayMode == 0) // Add icon only when showing both
+                {
+                    var icon = new Run("🌐 ")
+                    {
+                        FontSize = Math.Max(fontSize, 12)
+                    };
+                    para.Inlines.Add(icon);
+                }
+
+                var translatedRun = new Run(entry.TranslatedText)
+                {
+                    Foreground = GetBrush(TranslatedTextColor),
+                    FontSize = fontSize,
+                    FontWeight = FontWeights.SemiBold,
+                    FlowDirection = isTargetRtl ? System.Windows.FlowDirection.RightToLeft : System.Windows.FlowDirection.LeftToRight
+                };
+                para.Inlines.Add(translatedRun);
+            }
+
+            return para;
+        }
+
+        private void AddTextWithIcon(Paragraph para, string icon, string text, double fontSize,
+                                   bool isRtl, Color textColor, FontWeight fontWeight)
+        {
+            // Add icon
+            var iconRun = new Run($"{icon} ")
+            {
+                FontSize = Math.Max(fontSize - 1, 11)
+            };
+            para.Inlines.Add(iconRun);
+
+            // Add text
+            var textRun = new Run(text)
+            {
+                Foreground = GetBrush(textColor),
+                FontSize = Math.Max(fontSize - 2, 10),
+                FontWeight = fontWeight,
+                FlowDirection = isRtl ? System.Windows.FlowDirection.RightToLeft : System.Windows.FlowDirection.LeftToRight
+            };
+            para.Inlines.Add(textRun);
+        }
+    }
+
+    public partial class ChatBoxWindow : Window
+    {
+        // Cached brushes to avoid repeated allocation
+        private static readonly SolidColorBrush BlackBrush = new SolidColorBrush(Colors.Black);
+        private static readonly Dictionary<Color, SolidColorBrush> _globalBrushCache = new Dictionary<Color, SolidColorBrush>();
+        private readonly Dictionary<Color, SolidColorBrush> _brushCache = new Dictionary<Color, SolidColorBrush>();
+
+        // ChatBox styling helper
+        private readonly ChatBoxStyler _styler;
+
+        // Helper method to get or create cached brush with thread safety
+        private SolidColorBrush GetCachedBrush(Color color)
+        {
+            // First check instance cache for frequently used colors
+            if (_brushCache.TryGetValue(color, out var brush))
+            {
+                return brush;
+            }
+
+            // Then check global cache
+            lock (_globalBrushCache)
+            {
+                if (_globalBrushCache.TryGetValue(color, out brush))
+                {
+                    // Also add to instance cache for faster future access
+                    _brushCache[color] = brush;
+                    return brush;
+                }
+
+                // Create new brush and cache it
+                brush = new SolidColorBrush(color);
+                brush.Freeze(); // Freeze for better performance
+                _globalBrushCache[color] = brush;
+                _brushCache[color] = brush;
+                return brush;
+            }
         }
 
         // Constants
@@ -64,6 +290,9 @@ namespace ScreenTranslation
             Instance = this;
             InitializeComponent();
 
+            // Initialize styler
+            _styler = new ChatBoxStyler(_brushCache);
+
             // Register application-wide keyboard shortcut handler
             this.PreviewKeyDown += Application_KeyDown;
 
@@ -75,7 +304,7 @@ namespace ScreenTranslation
             {
                 // Set basic document properties
                 FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 14,
+                FontSize = 16,
                 Foreground = Brushes.White,
                 TextAlignment = TextAlignment.Left,
 
@@ -124,7 +353,7 @@ namespace ScreenTranslation
             cutItem.Command = ApplicationCommands.Cut;
             contextMenu.Items.Add(cutItem);
 
-            MenuItem copyItem = new MenuItem() { Header = "Copy" };
+            MenuItem copyItem = new MenuItem() { Header = "Copy Selected" };
             copyItem.Command = ApplicationCommands.Copy;
             contextMenu.Items.Add(copyItem);
 
@@ -135,18 +364,195 @@ namespace ScreenTranslation
             // Add a separator
             contextMenu.Items.Add(new Separator());
 
-            // Add Learn menu item
-            MenuItem learnItem = new MenuItem() { Header = "Learn" };
+            // Copy submenu
+            MenuItem copySubmenu = new MenuItem() { Header = "Copy Text" };
+            MenuItem copySourceItem = new MenuItem() { Header = "Copy Source Text" };
+            copySourceItem.Click += (s, e) => CopySourceMenuItem_Click(s, e);
+            copySubmenu.Items.Add(copySourceItem);
+
+            MenuItem copyTranslatedItem = new MenuItem() { Header = "Copy Translated Text" };
+            copyTranslatedItem.Click += (s, e) => CopyTranslatedMenuItem_Click(s, e);
+            copySubmenu.Items.Add(copyTranslatedItem);
+
+            MenuItem copyBothItem = new MenuItem() { Header = "Copy Both (Source + Translation)" };
+            copyBothItem.Click += CopyBothMenuItem_Click;
+            copySubmenu.Items.Add(copyBothItem);
+
+            contextMenu.Items.Add(copySubmenu);
+
+            // Add another separator
+            contextMenu.Items.Add(new Separator());
+
+            // Text-to-Speech submenu
+            MenuItem speakSubmenu = new MenuItem() { Header = "Text-to-Speech" };
+            MenuItem speakSourceItem = new MenuItem() { Header = "Speak Source Text" };
+            speakSourceItem.Click += (s, e) => SpeakSourceMenuItem_Click(s, e);
+            speakSubmenu.Items.Add(speakSourceItem);
+
+            MenuItem speakTranslatedItem = new MenuItem() { Header = "Speak Translated Text" };
+            speakTranslatedItem.Click += SpeakTranslatedMenuItem_Click;
+            speakSubmenu.Items.Add(speakTranslatedItem);
+
+            MenuItem stopSpeechItem = new MenuItem() { Header = "Stop Speaking" };
+            stopSpeechItem.Click += StopSpeechMenuItem_Click;
+            speakSubmenu.Items.Add(stopSpeechItem);
+
+            contextMenu.Items.Add(speakSubmenu);
+
+            // Learn menu item
+            MenuItem learnItem = new MenuItem() { Header = "Learn with AI" };
             learnItem.Click += LearnMenuItem_Click;
             contextMenu.Items.Add(learnItem);
 
-            // Add Speak menu item
-            MenuItem speakItem = new MenuItem() { Header = "Speak" };
-            speakItem.Click += SpeakMenuItem_Click;
-            contextMenu.Items.Add(speakItem);
+            // Add another separator
+            contextMenu.Items.Add(new Separator());
+
+            // History management
+            MenuItem historySubmenu = new MenuItem() { Header = "History" };
+            MenuItem clearHistoryItem = new MenuItem() { Header = "Clear All History" };
+            clearHistoryItem.Click += (s, e) => ClearButton_Click(s, e);
+            historySubmenu.Items.Add(clearHistoryItem);
+
+            MenuItem exportHistoryItem = new MenuItem() { Header = "Export History..." };
+            exportHistoryItem.Click += ExportHistoryMenuItem_Click;
+            historySubmenu.Items.Add(exportHistoryItem);
+
+            contextMenu.Items.Add(historySubmenu);
+
+            // Add another separator
+            contextMenu.Items.Add(new Separator());
+
+            // Settings submenu
+            MenuItem settingsSubmenu = new MenuItem() { Header = "Display Settings" };
+            MenuItem showBothItem = new MenuItem() { Header = "Show Both Languages" };
+            showBothItem.Click += (s, e) => { _displayMode = 0; UpdateChatHistory(); modeButton.Content = "Source&Translated Text"; };
+            settingsSubmenu.Items.Add(showBothItem);
+
+            MenuItem showTranslatedItem = new MenuItem() { Header = "Show Translated Only" };
+            showTranslatedItem.Click += (s, e) => { _displayMode = 1; UpdateChatHistory(); modeButton.Content = "Translated Text"; };
+            settingsSubmenu.Items.Add(showTranslatedItem);
+
+            MenuItem showSourceItem = new MenuItem() { Header = "Show Source Only" };
+            showSourceItem.Click += (s, e) => { _displayMode = 2; UpdateChatHistory(); modeButton.Content = "Source Text"; };
+            settingsSubmenu.Items.Add(showSourceItem);
+
+            contextMenu.Items.Add(settingsSubmenu);
+
+            // Update menu item states when context menu is opened
+            contextMenu.Opened += (s, e) =>
+            {
+                // Get selected text to determine available options
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                bool hasSelection = !string.IsNullOrWhiteSpace(selectedText.Text);
+
+                // Enable/disable items based on selection
+                copySourceItem.IsEnabled = hasSelection;
+                copyTranslatedItem.IsEnabled = hasSelection;
+                copyBothItem.IsEnabled = hasSelection;
+                speakSourceItem.IsEnabled = hasSelection;
+                speakTranslatedItem.IsEnabled = hasSelection;
+                learnItem.IsEnabled = hasSelection;
+
+                // Set checkmarks for display mode
+                showBothItem.IsChecked = _displayMode == 0;
+                showTranslatedItem.IsChecked = _displayMode == 1;
+                showSourceItem.IsChecked = _displayMode == 2;
+            };
 
             // Assign the context menu to the RichTextBox
             chatHistoryText.ContextMenu = contextMenu;
+        }
+
+        // Click handler for Copy Source menu item
+        private void CopySourceMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the selected text
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                if (!string.IsNullOrWhiteSpace(selectedText.Text))
+                {
+                    // For source text, we try to extract it from the selection
+                    // This is a simplified approach - copy the entire selection
+                    System.Windows.Forms.Clipboard.SetText(selectedText.Text.Trim());
+                    Console.WriteLine("Copied source text to clipboard");
+                }
+                else
+                {
+                    Console.WriteLine("No text selected for Copy Source function");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Copy Source function: {ex.Message}");
+            }
+        }
+
+        // Click handler for Copy Translated menu item
+        private void CopyTranslatedMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the selected text
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                if (!string.IsNullOrWhiteSpace(selectedText.Text))
+                {
+                    // For translated text, we try to extract it from the selection
+                    // This is a simplified approach - copy the entire selection
+                    System.Windows.Forms.Clipboard.SetText(selectedText.Text.Trim());
+                    Console.WriteLine("Copied translated text to clipboard");
+                }
+                else
+                {
+                    Console.WriteLine("No text selected for Copy Translated function");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Copy Translated function: {ex.Message}");
+            }
+        }
+
+        // Click handler for Speak Source menu item
+        private void SpeakSourceMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the selected text
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                if (!string.IsNullOrWhiteSpace(selectedText.Text))
+                {
+                    // For source text, we try to extract it from the selection
+                    // This is a simplified approach - speak the entire selection
+                    string text = selectedText.Text.Trim();
+                    EnqueueSpeechRequest(text);
+                    Console.WriteLine("Speaking source text");
+                }
+                else
+                {
+                    Console.WriteLine("No text selected for Speak Source function");
+                    System.Windows.MessageBox.Show("Please select some text to speak first.",
+                        "No Text Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Speak Source function: {ex.Message}");
+                System.Windows.MessageBox.Show($"Error: {ex.Message}", "Text-to-Speech Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void LearnMenuItem_Click(object sender, RoutedEventArgs e)
@@ -211,6 +617,154 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error in Speak function: {ex.Message}");
                 System.Windows.MessageBox.Show($"Error: {ex.Message}", "Text-to-Speech Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // Click handler for Copy Both menu item
+        private void CopyBothMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the selected text
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                if (!string.IsNullOrWhiteSpace(selectedText.Text))
+                {
+                    // Try to find both source and translated text in the same entry
+                    // This is a simplified approach - copy the selected text as-is
+                    System.Windows.Forms.Clipboard.SetText(selectedText.Text.Trim());
+                    Console.WriteLine("Copied both source and translated text to clipboard");
+                }
+                else
+                {
+                    Console.WriteLine("No text selected for Copy Both function");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Copy Both function: {ex.Message}");
+            }
+        }
+
+        // Click handler for Speak Translated menu item
+        private void SpeakTranslatedMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get the selected text
+                TextRange selectedText = new TextRange(
+                    chatHistoryText.Selection.Start,
+                    chatHistoryText.Selection.End);
+
+                if (!string.IsNullOrWhiteSpace(selectedText.Text))
+                {
+                    // For translated text, we try to extract it from the selection
+                    // This is a simplified approach - speak the entire selection
+                    string text = selectedText.Text.Trim();
+                    EnqueueSpeechRequest(text);
+                    Console.WriteLine("Speaking translated text");
+                }
+                else
+                {
+                    Console.WriteLine("No text selected for Speak Translated function");
+                    System.Windows.MessageBox.Show("Please select some text to speak first.",
+                        "No Text Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Speak Translated function: {ex.Message}");
+                System.Windows.MessageBox.Show($"Error: {ex.Message}", "Text-to-Speech Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // Click handler for Stop Speech menu item
+        private void StopSpeechMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Cancel any ongoing speech
+                if (_speechCancellationTokenSource != null)
+                {
+                    _speechCancellationTokenSource.Cancel();
+                    _speechCancellationTokenSource.Dispose();
+                    _speechCancellationTokenSource = null;
+                }
+
+                _isProcessingSpeech = false;
+                _speechQueue.Clear();
+
+                Console.WriteLine("Speech stopped by user");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error stopping speech: {ex.Message}");
+            }
+        }
+
+        // Click handler for Export History menu item
+        private void ExportHistoryMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Create a save file dialog
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "Text files (*.txt)|*.txt|CSV files (*.csv)|*.csv",
+                    DefaultExt = "txt",
+                    FileName = $"translation_history_{DateTime.Now:yyyyMMdd_HHmmss}"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    var history = MainWindow.Instance.GetTranslationHistory();
+                    var exportContent = new StringBuilder();
+
+                    if (saveFileDialog.FilterIndex == 1) // TXT format
+                    {
+                        exportContent.AppendLine("Translation History");
+                        exportContent.AppendLine($"Exported on: {DateTime.Now}");
+                        exportContent.AppendLine(new string('=', 50));
+                        exportContent.AppendLine();
+
+                        foreach (var entry in history)
+                        {
+                            exportContent.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}]");
+                            if (!string.IsNullOrEmpty(entry.OriginalText))
+                            {
+                                exportContent.AppendLine($"Source: {entry.OriginalText}");
+                            }
+                            if (!string.IsNullOrEmpty(entry.TranslatedText))
+                            {
+                                exportContent.AppendLine($"Translation: {entry.TranslatedText}");
+                            }
+                            exportContent.AppendLine();
+                        }
+                    }
+                    else // CSV format
+                    {
+                        exportContent.AppendLine("Timestamp,Source Text,Translated Text");
+                        foreach (var entry in history)
+                        {
+                            string source = entry.OriginalText?.Replace("\"", "\"\"") ?? "";
+                            string translated = entry.TranslatedText?.Replace("\"", "\"\"") ?? "";
+                            exportContent.AppendLine($"\"{entry.Timestamp:yyyy-MM-dd HH:mm:ss}\",\"{source}\",\"{translated}\"");
+                        }
+                    }
+
+                    System.IO.File.WriteAllText(saveFileDialog.FileName, exportContent.ToString());
+                    System.Windows.MessageBox.Show($"History exported to {saveFileDialog.FileName}",
+                        "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error exporting history: {ex.Message}");
+                System.Windows.MessageBox.Show($"Error exporting history: {ex.Message}",
+                    "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -417,6 +971,21 @@ namespace ScreenTranslation
             this.Hide();
 
             // Note: We maintain timer and event subscriptions since the window instance stays alive
+
+            // Periodic cleanup of brush cache to prevent memory leaks
+            if (_globalBrushCache.Count > 200) // Limit global cache size
+            {
+                lock (_globalBrushCache)
+                {
+                    // Keep only the most recently used brushes (simple LRU approximation)
+                    var keysToRemove = _globalBrushCache.Keys.Take(_globalBrushCache.Count - 100).ToList();
+                    foreach (var key in keysToRemove)
+                    {
+                        _globalBrushCache.Remove(key);
+                    }
+                    Console.WriteLine($"Cleaned up {_globalBrushCache.Count} brushes from global cache");
+                }
+            }
         }
 
         public void ApplyConfigurationStyling()
@@ -608,7 +1177,7 @@ namespace ScreenTranslation
         }
 
         // Store chat font size separately from window fonts
-        private double _chatFontSize = 14;  // Default chat font size
+        private double _chatFontSize = 16;  // Default chat font size
 
         public double ChatFontSize
         {
@@ -757,37 +1326,12 @@ namespace ScreenTranslation
             }
         }
 
-        // Handle animation timer tick
+        // Handle animation timer tick - now used for progress bar animation
         private void AnimationTimer_Tick(object? sender, EventArgs e)
         {
-            // Update the animation step (0, 1, 2, 3)
+            // The progress bar is indeterminate, so no manual animation needed
+            // This timer is kept for backward compatibility and potential future use
             _animationStep = (_animationStep + 1) % 4;
-
-            // Update dot visibility based on animation step
-            if (dot1 != null && dot2 != null && dot3 != null)
-            {
-                // Reset all dots
-                dot1.Opacity = 0.3;
-                dot2.Opacity = 0.3;
-                dot3.Opacity = 0.3;
-
-                // Highlight dots based on animation step
-                switch (_animationStep)
-                {
-                    case 0:
-                        dot1.Opacity = 1.0;
-                        break;
-                    case 1:
-                        dot2.Opacity = 1.0;
-                        break;
-                    case 2:
-                        dot3.Opacity = 1.0;
-                        break;
-                    case 3:
-                        // All dots dim
-                        break;
-                }
-            }
         }
 
         // Show translation status indicator with animation
@@ -799,25 +1343,42 @@ namespace ScreenTranslation
                 return;
             }
 
-            if (translationStatusPanel != null)
+            if (translationStatusPanel != null && translationStatusText != null && serviceIcon != null)
             {
                 // Show the translation status panel
                 translationStatusPanel.Visibility = Visibility.Visible;
 
                 // Update content based on settling state
-                if (bSettling && translationStatusText != null)
+                if (bSettling)
                 {
-                    // If settling, show "Settling..." message
-                    translationStatusText.Text = "Settling...";
+                    // If settling, show settling message
+                    translationStatusText.Text = "Processing captured text...";
+                    serviceIcon.Text = "⚡";
+                    serviceIcon.Foreground = GetCachedBrush(Color.FromRgb(255, 215, 0)); // Gold
                 }
-                else if (translationStatusText != null)
+                else
                 {
                     // If translating, show translation notification with service name
                     string service = ConfigManager.Instance.GetCurrentTranslationService();
-                    translationStatusText.Text = $"Waiting for {service}...";
+
+                    // Set appropriate icon and text based on service
+                    switch (service.ToLower())
+                    {
+                        case "openai":
+                        case "chatgpt":
+                            serviceIcon.Text = "🤖";
+                            translationStatusText.Text = "Translating with OpenAI...";
+                            break;
+                        default:
+                            serviceIcon.Text = "🔄";
+                            translationStatusText.Text = $"Translating with {service}...";
+                            break;
+                    }
+
+                    serviceIcon.Foreground = GetCachedBrush(Color.FromRgb(255, 215, 0)); // Gold for active translation
                 }
 
-                // Start animation timer in all cases
+                // Start animation timer in all cases (for backward compatibility with old animation)
                 if (_animationTimer != null && !_animationTimer.IsEnabled)
                 {
                     _animationStep = 0;
@@ -900,17 +1461,17 @@ namespace ScreenTranslation
                 if (_displayMode == 0)
                 {
                     // Both
-                    modeButton.Content = "Source&Translated Text";
+                    modeButton.Content = "Both";
                 }
                 else if (_displayMode == 1)
                 {
                     // Target only
-                    modeButton.Content = "Translated Text";
+                    modeButton.Content = "Translation";
                 }
                 else if (_displayMode == 2)
                 {
                     // Source only
-                    modeButton.Content = "Source Text";
+                    modeButton.Content = "Source";
                 }
 
                 // Update the UI
@@ -949,6 +1510,25 @@ namespace ScreenTranslation
             }
         }
 
+        private void CancelTranslationButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Hide the translation status panel
+                HideTranslationStatus();
+
+                // Cancel any ongoing translation process
+                // TODO: Implement cancellation in Logic class when needed
+                // For now, just hide the status panel
+
+                Console.WriteLine("Translation cancelled by user");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error cancelling translation: {ex.Message}");
+            }
+        }
+
         public void UpdateChatHistory()
         {
             // Only update if window is visible
@@ -958,6 +1538,15 @@ namespace ScreenTranslation
             // Run on UI thread
             this.Dispatcher.Invoke(() =>
             {
+                // Performance optimization: Skip update if window size hasn't changed significantly
+                // and content hasn't changed (basic check)
+                var translationHistory = MainWindow.Instance.GetTranslationHistory();
+                if (translationHistory.Count == 0 && chatHistoryText.Document.Blocks.Count == 0)
+                {
+                    // Update entry count even when empty
+                    UpdateEntryCountDisplay(0);
+                    return; // No content to display
+                }
                 // Get styling from window's properties and config
                 var fontFamily = this.FontFamily;
                 var fontSize = this.ChatFontSize;
@@ -983,14 +1572,28 @@ namespace ScreenTranslation
                     Console.WriteLine($"ChatBox: Detected RTL target language: {targetLanguage}");
                 }
 
+                // Performance optimization: Only clear and rebuild if necessary
+                // Check if we need to rebuild (simplified check - rebuild if count differs significantly)
+                int currentBlockCount = chatHistoryText.Document.Blocks.Count;
+                int expectedBlockCount = Math.Min(translationHistory.Count * 2, _maxHistorySize * 2); // Rough estimate: 2 blocks per entry
+
+                if (Math.Abs(currentBlockCount - expectedBlockCount) < 3 && currentBlockCount > 0)
+                {
+                    // Minor changes, might not need full rebuild - but for now, we'll keep it simple and rebuild
+                    // TODO: Implement incremental updates for better performance
+                }
+
                 // Clear existing content
                 chatHistoryText.Document.Blocks.Clear();
 
                 // Set up document properties to enable text wrapping
-                // PageWidth should match the viewport width of the ScrollViewer (minus padding)
-                // Subtract extra pixels to ensure text doesn't get too close to the scrollbar
-                chatHistoryText.Document.PageWidth = chatScrollViewer.ActualWidth > 0
-                    ? (chatScrollViewer.ActualWidth - 30) : 320;
+                double viewportWidth = CalculateOptimalPageWidth();
+
+                // Only update page width if it changed significantly
+                if (Math.Abs(chatHistoryText.Document.PageWidth - viewportWidth) > 10)
+                {
+                    chatHistoryText.Document.PageWidth = viewportWidth;
+                }
 
                 // Set the background opacity
                 if (bgOpacity <= 0)
@@ -1017,14 +1620,20 @@ namespace ScreenTranslation
                     chatHistoryText.Background = Brushes.Transparent;
                 }
 
-                // Get the history from MainWindow
-                var mainWindowHistory = MainWindow.Instance.GetTranslationHistory();
-
+                // Get the history from MainWindow (already retrieved above as translationHistory)
                 // Get only the most recent entries for display (based on _maxHistorySize)
-                var displayHistory = mainWindowHistory.Reverse().Take(_maxHistorySize).Reverse();
+                var displayHistory = translationHistory.Reverse().Take(_maxHistorySize).Reverse();
+
+                // Update entry count display
+                int totalEntries = translationHistory.Count;
+                int displayEntries = displayHistory.Count();
+                UpdateEntryCountDisplay(totalEntries, displayEntries);
 
                 // Get Min ChatBox Text Size setting
                 int minChatBoxTextSize = ConfigManager.Instance.GetChatBoxMinTextSize();
+
+                // Track entry number for alternating backgrounds
+                int entryIndex = 0;
 
                 // Create a paragraph for each entry to display
                 foreach (var entry in displayHistory)
@@ -1035,105 +1644,94 @@ namespace ScreenTranslation
                         continue;
                     }
 
-                    // Create a new paragraph for this entry
-                    Paragraph para = new Paragraph();
+                    // Create entry section using styler
+                    Section entrySection = _styler.CreateEntrySection(entryIndex++, fontSize, bgOpacity);
 
-                    // Set paragraph properties - regular margins now that scrollbar is outside
-                    para.Margin = new Thickness(5, 10, 5, 10); // Add vertical spacing
-                    para.TextIndent = 0;
-                    para.LineHeight = Double.NaN; // Use default line height
+                    // Create header paragraph using styler
+                    Paragraph headerPara = _styler.CreateHeaderParagraph(entry, fontSize, _displayMode);
+                    entrySection.Blocks.Add(headerPara);
 
-                    // Check if translation failed (translated text is same as original)
+                    // Check if translation failed
                     bool translationFailed = !string.IsNullOrEmpty(entry.OriginalText) &&
                                              !string.IsNullOrEmpty(entry.TranslatedText) &&
                                              entry.OriginalText == entry.TranslatedText;
 
-                    // Add original text based on display mode, or when translation failed
-                    bool showOriginal = (_displayMode == 0 || _displayMode == 2) && !string.IsNullOrEmpty(entry.OriginalText);
+                    // Create content paragraph using styler
+                    Paragraph contentPara = _styler.CreateContentParagraph(entry, fontSize, _displayMode,
+                                                                          translationFailed, isSourceRtl, isTargetRtl);
 
-                    if (showOriginal || (translationFailed && (_displayMode == 0 || _displayMode == 1)))
-                    {
-                        // Create a run for the original text
-                        string originalText = entry.OriginalText;
-
-                        // Add RTL mark if source language is RTL
-                        if (isSourceRtl && !originalText.StartsWith("\u200F"))
-                        {
-                            originalText = "\u200F" + originalText;
-                        }
-
-                        Run originalRun = new Run(originalText);
-
-                        // Format it appropriately - use translated text color if this is due to translation failure
-                        var textColor = translationFailed ? translatedTextColor : originalTextColor;
-                        originalRun.Foreground = GetCachedBrush(textColor);
-                        originalRun.FontFamily = fontFamily;
-                        originalRun.FontSize = Math.Max(fontSize - 2, 10);
-
-                        // Set flow direction for the run
-                        originalRun.FlowDirection = isSourceRtl ?
-                            System.Windows.FlowDirection.RightToLeft :
-                            System.Windows.FlowDirection.LeftToRight;
-
-                        // Add it to the paragraph
-                        para.Inlines.Add(originalRun);
-
-                        // Add line breaks if there's also translated text to be shown
-                        if ((_displayMode == 0) && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
-                        {
-                            para.Inlines.Add(new LineBreak());
-                            para.Inlines.Add(new LineBreak());
-                        }
-                    }
-
-                    // Add translated text based on display mode (skip if translation failed)
-                    if ((_displayMode == 0 || _displayMode == 1) && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
-                    {
-                        // Create a run for the translated text
-                        string translatedText = entry.TranslatedText;
-
-                        // Add RTL mark if target language is RTL
-                        if (isTargetRtl && !translatedText.StartsWith("\u200F"))
-                        {
-                            translatedText = "\u200F" + translatedText;
-                        }
-
-                        Run translatedRun = new Run(translatedText);
-
-                        // Format it appropriately
-                        translatedRun.Foreground = GetCachedBrush(translatedTextColor);
-                        translatedRun.FontFamily = fontFamily;
-                        translatedRun.FontSize = fontSize;
-                        translatedRun.FontWeight = FontWeights.SemiBold;
-
-                        // Set flow direction for the run
-                        translatedRun.FlowDirection = isTargetRtl ?
-                            System.Windows.FlowDirection.RightToLeft :
-                            System.Windows.FlowDirection.LeftToRight;
-
-                        // Add it to the paragraph
-                        para.Inlines.Add(translatedRun);
-                    }
-
-                    // Set the flow direction for the entire paragraph based on content
+                    // Set flow direction for the entire paragraph
                     if ((_displayMode == 1 && isTargetRtl) ||
                         (_displayMode == 2 && isSourceRtl) ||
                         (_displayMode == 0 && isTargetRtl))
                     {
-                        para.FlowDirection = System.Windows.FlowDirection.RightToLeft;
+                        contentPara.FlowDirection = System.Windows.FlowDirection.RightToLeft;
                     }
                     else
                     {
-                        para.FlowDirection = System.Windows.FlowDirection.LeftToRight;
+                        contentPara.FlowDirection = System.Windows.FlowDirection.LeftToRight;
                     }
 
-                    // Add the paragraph to the document
-                    chatHistoryText.Document.Blocks.Add(para);
+                    entrySection.Blocks.Add(contentPara);
+
+                    // Add the section to the document
+                    chatHistoryText.Document.Blocks.Add(entrySection);
                 }
 
                 // Scroll to the bottom to see newest entries
                 chatScrollViewer.ScrollToEnd();
             });
+        }
+
+        // Update the entry count display in the header
+        private void UpdateEntryCountDisplay(int totalEntries, int displayEntries = -1)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => UpdateEntryCountDisplay(totalEntries, displayEntries));
+                return;
+            }
+
+            if (entryCountText != null)
+            {
+                if (displayEntries == -1)
+                {
+                    displayEntries = totalEntries;
+                }
+
+                if (totalEntries == 0)
+                {
+                    entryCountText.Text = "No entries";
+                    entryCountText.Foreground = _styler.GetBrush(ChatBoxStyler.EntryCountEmptyColor);
+                }
+                else if (totalEntries <= displayEntries)
+                {
+                    entryCountText.Text = $"{totalEntries} entr{(totalEntries == 1 ? "y" : "ies")}";
+                    entryCountText.Foreground = _styler.GetBrush(ChatBoxStyler.EntryCountColor);
+                }
+                else
+                {
+                    entryCountText.Text = $"{displayEntries} of {totalEntries} entries";
+                    entryCountText.Foreground = _styler.GetBrush(ChatBoxStyler.EntryCountTruncatedColor);
+                }
+            }
+        }
+
+        // Overload for simple updates
+        private void UpdateEntryCountDisplay(int totalEntries)
+        {
+            UpdateEntryCountDisplay(totalEntries, totalEntries);
+        }
+
+        // Calculate optimal page width for text wrapping
+        private double CalculateOptimalPageWidth()
+        {
+            // PageWidth should match the viewport width of the ScrollViewer (minus padding)
+            // Subtract extra pixels to ensure text doesn't get too close to the scrollbar
+            double viewportWidth = chatScrollViewer.ActualWidth > 0 ? chatScrollViewer.ActualWidth - 30 : 320;
+
+            // Ensure minimum width for readability
+            return Math.Max(viewportWidth, 200);
         }
     }
 

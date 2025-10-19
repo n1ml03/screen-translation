@@ -255,13 +255,22 @@ namespace ScreenTranslation
                 // Try to parse as JSON
                 var jsonResult = JsonConvert.DeserializeObject<dynamic>(jsonOutput);
 
-                if (jsonResult?.status == "success" && jsonResult?.text != null)
+                if (jsonResult?.status == "success")
                 {
-                    return jsonResult.text.ToString();
+                    var text = jsonResult?.text;
+                    if (text != null)
+                    {
+                        return text.ToString();
+                    }
+                    else
+                    {
+                        throw new Exception("OCR returned success but no text content");
+                    }
                 }
                 else if (jsonResult?.status == "error")
                 {
-                    throw new Exception($"Python error: {jsonResult.message}");
+                    var message = jsonResult?.message;
+                    throw new Exception($"Python error: {message ?? "Unknown error"}");
                 }
                 else
                 {
