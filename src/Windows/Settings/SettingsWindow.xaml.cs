@@ -1,23 +1,16 @@
-using System;
-using System.Linq;
-using System.Net.Http;
-using System.Text.Json;
-using System.Threading.Tasks;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Documents;
-using System.Windows.Navigation;
-using System.Windows.Media.Animation;
-using System.Diagnostics;
-using System.Collections.ObjectModel;
-using ComboBox = System.Windows.Controls.ComboBox;
-using ProgressBar = System.Windows.Controls.ProgressBar;
-using MessageBox = System.Windows.MessageBox;
-using System.Windows.Forms;
 using System.Windows.Interop;
-using Windows.Media.SpeechSynthesis;
-using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using ComboBox = System.Windows.Controls.ComboBox;
+using MessageBox = System.Windows.MessageBox;
+using Button = System.Windows.Controls.Button;
+using Brushes = System.Windows.Media.Brushes;
+using Application = System.Windows.Application;
 
 #pragma warning disable CA1416 // Validate platform compatibility
 
@@ -28,7 +21,7 @@ namespace ScreenTranslation
     {
         public string Phrase { get; set; } = string.Empty;
         public bool ExactMatch { get; set; } = true;
-        
+
         public IgnorePhrase(string phrase, bool exactMatch)
         {
             Phrase = phrase;
@@ -42,7 +35,6 @@ namespace ScreenTranslation
 
         public static bool _isLanguagePackInstall = false;
 
-        public string profileName = "";
 
         public static SettingsWindow Instance
         {
@@ -65,7 +57,6 @@ namespace ScreenTranslation
             InitializeComponent();
             _instance = this;
             LoadAvailableScreens();
-            LoadAllProfile();
             LoadAvailableWindowTTSVoice();
 
             // Add Loaded event handler to ensure controls are initialized
@@ -85,7 +76,6 @@ namespace ScreenTranslation
         {
             _instance = this;
             LoadAvailableScreens();
-            LoadAllProfile();
             LoadAvailableWindowTTSVoice();
             SettingsWindow_Loaded(null, null);
         }
@@ -121,7 +111,7 @@ namespace ScreenTranslation
 
                 // Make sure button check language package are properly initialize
                 string currentOcr = ConfigManager.Instance.GetOcrMethod();
-                if (currentOcr != "Windows OCR")
+                if (currentOcr != "OneOCR")
                 {
                     checkLanguagePack.Visibility = Visibility.Collapsed;
                     checkLanguagePackButton.Visibility = Visibility.Collapsed;
@@ -154,6 +144,7 @@ namespace ScreenTranslation
 
                 ConfigManager.Instance.SetOcrMethod(configOcrMethod);
                 ConfigManager.Instance.SetTranslationService(configTransService);
+
 
                 Console.WriteLine("Settings window fully loaded and initialized. Changes will now be saved.");
             }
@@ -574,8 +565,8 @@ namespace ScreenTranslation
             // Set auto OCR
             AutoOCRCheckBox.IsChecked = ConfigManager.Instance.IsAutoOCREnabled();
 
-            // Set WindowsOCR integration
-            windowsOCRIntegrationCheckBox.IsChecked = ConfigManager.Instance.IsWindowsOCRIntegrationEnabled();
+            // Set OneOCR integration
+            oneOCRIntegrationCheckBox.IsChecked = ConfigManager.Instance.IsOneOCRIntegrationEnabled();
 
             // Set multi selection area from config
             multiSelectionAreaCheckBox.IsChecked = ConfigManager.Instance.IsMultiSelectionAreaEnabled();
@@ -959,7 +950,7 @@ namespace ScreenTranslation
                     SocketManager.Instance.Disconnect();
 
                     // await SocketManager.Instance.SwitchOcrMethod(ocrMethod);
-                    if (ocrMethod != "Windows OCR")
+                    if (ocrMethod != "OneOCR")
                     {
                         checkLanguagePack.Visibility = Visibility.Collapsed;
                         checkLanguagePackButton.Visibility = Visibility.Collapsed;
@@ -969,6 +960,7 @@ namespace ScreenTranslation
                         checkLanguagePack.Visibility = Visibility.Visible;
                         checkLanguagePackButton.Visibility = Visibility.Visible;
                     }
+
 
                 }
             }
@@ -1445,7 +1437,7 @@ namespace ScreenTranslation
 
                 if (chatGptModelComboBox.SelectedItem is ComboBoxItem selectedItem)
                 {
-                    string model = selectedItem.Tag?.ToString() ?? "gpt-3.5-turbo";
+                    string model = selectedItem.Tag?.ToString() ?? "41-nano-ktv";
 
                     // Save to config
                     ConfigManager.Instance.SetChatGptModel(model);
@@ -1809,7 +1801,7 @@ namespace ScreenTranslation
             {
                 Console.WriteLine($"Checking language pack for: {sourceLanguage}");
 
-                _isLanguagePackInstall = WindowsOCRManager.Instance.CheckLanguagePackInstall(sourceLanguage);
+                _isLanguagePackInstall = OneOCRManager.Instance.CheckLanguagePackInstall(sourceLanguage);
 
                 if (_isLanguagePackInstall)
                 {
@@ -1817,13 +1809,13 @@ namespace ScreenTranslation
                 }
                 else
                 {
-                    if (!string.IsNullOrEmpty(WindowsOCRManager.Instance._currentLanguageCode))
+                    if (!string.IsNullOrEmpty(OneOCRManager.Instance._currentLanguageCode))
                     {
                         string message = "Language pack is not installed. \n\n" +
                                      "To install the corresponding language pack, please follow these steps:\n\n" +
                                      "Step 1: Press \"Windows + S\" button, type \"language settings\" and press Enter button.\n\n" +
                                      "Step 2: Click on \"Add a language\" button.\n\n" +
-                                     $"Step 3: Type \"{WindowsOCRManager.Instance._currentLanguageCode}\" to search.\n\n" +
+                                     $"Step 3: Type \"{OneOCRManager.Instance._currentLanguageCode}\" to search.\n\n" +
                                      "Step 4:  Click \"Next\" button, uncheck all option and click \"install\".\n\n" +
                                      "Wait for language package install complete and retry";
 
@@ -1831,249 +1823,17 @@ namespace ScreenTranslation
                     }
                     else
                     {
-                        MessageBox.Show("This language is not supported for WindowsOCR", "Language Pack Check", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show("This language is not supported for OneOCR", "Language Pack Check", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
             }
 
         }
 
-        private void CreateProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Button button)
-            {
-                profileName = profileNameTextBox.Text.Trim();
-
-                if (string.IsNullOrEmpty(profileName))
-                {
-                    MessageBox.Show("Please enter a profile name.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    // Create profile with current config
-                    ConfigManager.Instance.SaveTranslationAreas(MainWindow.Instance.savedTranslationAreas, profileName);
-                    // Add to combo box
-                    bool exists = false;
-                    foreach (var item in profileComboBox.Items)
-                    {
-                        if (item.ToString() == profileName)
-                        {
-                            profileComboBox.SelectedItem = item;
-                            exists = true;
-                            break;
-                        }
-                    }
 
 
-                    if (!exists)
-                    {
-                        profileComboBox.Items.Add(profileName);
-                        profileComboBox.SelectedIndex = profileComboBox.Items.Count - 1;
-                    }
-                    // Show status
-                    statusUpdateGameProfile.Visibility = Visibility.Visible;
-                    statusUpdateGameProfile.Text = $"Create {profileName} successfully!";
-                    statusUpdateGameProfile.Foreground = new SolidColorBrush(System.Windows.Media.Colors.Green);
 
-                    // Auto close status after 1.5 second
-                    var timer = new System.Windows.Threading.DispatcherTimer
-                    {
-                        Interval = TimeSpan.FromSeconds(1.5)
-                    };
 
-                    timer.Tick += (s, e) =>
-                    {
-                        statusUpdateGameProfile.Text = "";
-                        timer.Stop();
-                    };
-
-                    timer.Start();
-                }
-            }
-        }
-
-        private void RemoveProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (profileComboBox.SelectedItem != null)
-            {
-                string? selectedText = profileComboBox.SelectedItem.ToString();
-                string filePath = Path.Combine(ConfigManager.Instance._profileFolderPath, $"{selectedText}.txt");
-                if (File.Exists(filePath))
-                {
-                    MessageBoxResult result = MessageBox.Show("Are you sure to remove this profile?", "Confirm", MessageBoxButton.OKCancel, MessageBoxImage.Information);
-                    if (result == MessageBoxResult.OK)
-                    {
-                        File.Delete(filePath);
-                        Console.WriteLine("Profile deleted successfully!");
-                        profileComboBox.Items.Remove(selectedText);
-                        profileComboBox.SelectedIndex = -1;
-                        // Clear all save selection areas
-                        MainWindow.Instance.savedTranslationAreas.Clear();
-                        MainWindow.Instance.hasSelectedTranslationArea = false;
-                        MainWindow.Instance.currentAreaIndex = -1;
-                        // Show status
-                        statusUpdateGameProfile.Visibility = Visibility.Visible;
-                        statusUpdateGameProfile.Text = $"Remove {profileName} successfully!";
-                        statusUpdateGameProfile.Foreground = new SolidColorBrush(System.Windows.Media.Colors.Red);
-
-                        // Auto close status after 1.5 second
-                        var timer = new System.Windows.Threading.DispatcherTimer
-                        {
-                            Interval = TimeSpan.FromSeconds(1.5)
-                        };
-
-                        timer.Tick += (s, e) =>
-                        {
-                            statusUpdateGameProfile.Text = "";
-                            timer.Stop();
-                        };
-
-                        timer.Start();
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("Profile not found, can not remove", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("No profile selected, please select a profile from combo box", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void UpdateProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (profileComboBox.SelectedItem != null)
-            {
-                string selectedText = profileComboBox.SelectedItem.ToString() ?? "Default";
-                string filePath = Path.Combine(ConfigManager.Instance._profileFolderPath, $"{selectedText}.txt");
-                if (File.Exists(filePath))
-                {
-                    MessageBoxResult result = MessageBox.Show("Are you sure to update this profile?", "Confirm", MessageBoxButton.OKCancel, MessageBoxImage.Information);
-                    if (result == MessageBoxResult.OK)
-                    {
-                        if (MainWindow.Instance.savedTranslationAreas.Count > 0)
-                        {
-                            ConfigManager.Instance.SaveTranslationAreas(MainWindow.Instance.savedTranslationAreas, selectedText);
-                            Console.WriteLine($"Saved {selectedText}.txt {MainWindow.Instance.savedTranslationAreas.Count} translation areas to config");
-                        }
-                        else
-                        {
-                            // Clear saved areas in config if we have none
-                            ConfigManager.Instance.SaveTranslationAreas(new List<Rect>(), selectedText);
-                            Console.WriteLine("Cleared translation areas in config");
-                        }
-                        // Show status
-                        statusUpdateGameProfile.Visibility = Visibility.Visible;
-                        statusUpdateGameProfile.Text = $"Update {profileName} successfully!";
-                        statusUpdateGameProfile.Foreground = new SolidColorBrush(System.Windows.Media.Colors.Orange);
-
-                        // Auto close status after 1.5 second
-                        var timer = new System.Windows.Threading.DispatcherTimer
-                        {
-                            Interval = TimeSpan.FromSeconds(1.5)
-                        };
-
-                        timer.Tick += (s, e) =>
-                        {
-                            statusUpdateGameProfile.Text = "";
-                            timer.Stop();
-                        };
-
-                        timer.Start();
-                    }
-
-                }
-                else
-                {
-                    MessageBox.Show("Profile not found, please try to create new other profile", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("No profile selected, please select a profile from combo box", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void LoadProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (profileComboBox.SelectedItem != null)
-            {
-                string? selectedText = profileComboBox.SelectedItem.ToString();
-                string filePath = Path.Combine(ConfigManager.Instance._profileFolderPath, $"{selectedText}.txt");
-                if (File.Exists(filePath))
-                {
-                    // Get saved areas from config
-                    List<Rect> areas = ConfigManager.Instance.GetTranslationAreas(filePath);
-                    if (areas.Count > 0)
-                    {
-                        // Update our areas list
-                        MainWindow.Instance.savedTranslationAreas.Clear();
-                        MainWindow.Instance.savedTranslationAreas = areas;
-                        MainWindow.Instance.hasSelectedTranslationArea = true;
-                        MainWindow.Instance.SwitchToTranslationArea(MainWindow.Instance.savedTranslationAreas.Count - 1);
-                    }
-                    else
-                    {
-                        Console.WriteLine("No translation areas found in config");
-                    }
-                    // Show status
-                    statusUpdateGameProfile.Visibility = Visibility.Visible;
-                    statusUpdateGameProfile.Text = $"Load {profileName} successfully!";
-                    statusUpdateGameProfile.Foreground = new SolidColorBrush(System.Windows.Media.Colors.Violet);
-                    ReloadSetting();
-
-                    // Auto close status after 1.5 second
-                    var timer = new System.Windows.Threading.DispatcherTimer
-                    {
-                        Interval = TimeSpan.FromSeconds(1.5)
-                    };
-
-                    timer.Tick += (s, e) =>
-                    {
-                        statusUpdateGameProfile.Text = "";
-                        timer.Stop();
-                    };
-
-                    timer.Start();
-                }
-                else
-                {
-                    MessageBox.Show("Profile not found, please try to create new other profile", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("No profile selected", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private void LoadAllProfile()
-        {
-            if (!Directory.Exists(ConfigManager.Instance._profileFolderPath))
-            {
-                Directory.CreateDirectory(ConfigManager.Instance._profileFolderPath);
-            }
-
-            profileComboBox.Items.Clear();
-            
-            HashSet<string> uniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
-            List<string?> fileNames = Directory.GetFiles(ConfigManager.Instance._profileFolderPath, "*.txt")
-                .Select(Path.GetFileNameWithoutExtension)
-                .Where(name => !string.IsNullOrEmpty(name))
-                .OrderBy(name => name)
-                .ToList();
-
-            foreach (string? name in fileNames)
-            {
-                if (!string.IsNullOrEmpty(name) && uniqueNames.Add(name))
-                {
-                    profileComboBox.Items.Add(name);
-                }
-            }
-        }
 
         // Handle Clear Context button click
         private void ClearContextButton_Click(object sender, RoutedEventArgs e)
@@ -2327,171 +2087,19 @@ namespace ScreenTranslation
             isNeedShowMessage = !enabled;
         }
 
-        private void InstallServerButton_Click(object sender, RoutedEventArgs e)
+
+
+
+
+
+
+
+
+        private void OneOCRIntegrationCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                // Get the base directory of the application
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "translation_server");
-                // Choose the appropriate batch file and working directory based on the OCR method
-                string setupBatchFileName = "install_requirements.bat";
-                // Check if batch file exists
-                string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                if (!File.Exists(setupBatchFilePath))
-                {
-                    Console.WriteLine($"File installation not found: {setupBatchFilePath}");
-                    return;
-                }
-                // Initialize process start info
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {setupBatchFileName}",
-                    WorkingDirectory = workingDirectory,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
-                };
-
-                // Start the process
-                using (Process? setupProcess = Process.Start(startInfo))
-                {
-                    if (setupProcess == null)
-                    {
-                        Console.WriteLine("Unable to start the server installation process");
-                        return;
-                    }
-
-                    // Wait for the process to finish
-                    setupProcess.WaitForExit();
-
-                    Console.WriteLine($"The server installation process has been completed");
-                    return;
-                }
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error when installing server: {ex.Message}");
-                return;
-            }
-        }
-
-        private void StartServerButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Get the base directory of the application
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "translation_server");
-                // Choose the appropriate batch file and working directory based on the OCR method
-                string setupBatchFileName = "start_server.bat";
-                // Check if batch file exists
-                string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                if (!File.Exists(setupBatchFilePath))
-                {
-                    Console.WriteLine($"File start not found: {setupBatchFilePath}");
-                    return;
-                }
-                // Initialize process start info
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {setupBatchFileName}",
-                    WorkingDirectory = workingDirectory,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
-                };
-
-                // Start the process
-                using (Process? setupProcess = Process.Start(startInfo))
-                {
-                    if (setupProcess == null)
-                    {
-                        Console.WriteLine("Unable to start the server process");
-                        return;
-                    }
-
-                    Console.WriteLine($"The server start process has been completed");
-                    return;
-                }
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error when start server: {ex.Message}");
-                return;
-            }
-        }
-
-        private void RemoveServerButton_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBoxResult result = System.Windows.MessageBox.Show(
-                    $"Are you sure you want to remove this hotspot server?",
-                    "Confirm Removal",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    // Get the base directory of the application
-                    string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                    string workingDirectory = Path.Combine(baseDirectory, "translation_server");
-                    // Choose the appropriate batch file and working directory based on the OCR method
-                    string setupBatchFileName = "Remove_server.bat";
-                    // Check if batch file exists
-                    string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                    if (!File.Exists(setupBatchFilePath))
-                    {
-                        Console.WriteLine($"File start not found: {setupBatchFilePath}");
-                        return;
-                    }
-                    // Initialize process start info
-                    ProcessStartInfo startInfo = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c {setupBatchFileName}",
-                        WorkingDirectory = workingDirectory,
-                        UseShellExecute = true,
-                        CreateNoWindow = false
-                    };
-
-                    // Start the process
-                    using (Process? setupProcess = Process.Start(startInfo))
-                    {
-                        if (setupProcess == null)
-                        {
-                            Console.WriteLine("Unable to Remove the server");
-                            return;
-                        }
-
-                        Console.WriteLine($"The server has been removed");
-                        return;
-                    }
-
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error when remove server: {ex.Message}");
-                    return;
-                }
-            }
-        }
-
-        private void IsSendDataToServerCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
-        {
-            bool enabled = isSendDataToServerCheckBox.IsChecked ?? false;
-            ConfigManager.Instance.SetSendDataToServer(enabled);
-            Console.WriteLine($"Settings window: Is send data to server set to {enabled}");
-        }
-
-        private void WindowsOCRIntegrationCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
-        {
-            bool enabled = windowsOCRIntegrationCheckBox.IsChecked ?? false;
-            ConfigManager.Instance.SetWindowsOCRIntegration(enabled);
-            Console.WriteLine($"WindowsOCR integration set to {enabled}");
+            bool enabled = oneOCRIntegrationCheckBox.IsChecked ?? false;
+            ConfigManager.Instance.SetOneOCRIntegration(enabled);
+            Console.WriteLine($"OneOCR integration set to {enabled}");
         }
 
         private void AutoOCRCheckBox_CheckedChanged(object sender, RoutedEventArgs e)

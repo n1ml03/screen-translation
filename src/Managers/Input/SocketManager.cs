@@ -14,20 +14,18 @@ namespace ScreenTranslation
         private bool _tryingToConnect = false;
         // Semaphore to prevent concurrent connect/disconnect operations
         private SemaphoreSlim _connectionSemaphore = new SemaphoreSlim(1, 1);
-        
+
         // Reusable buffers to reduce allocations
         private byte[] _reusableSizeBuffer = new byte[128];
         private byte[] _reusableBuffer = new byte[8192];
-        
+
         // Constants for OCR server ports
-        public const int EASYOCR_PORT = 9999;
         public const int PADDLEOCR_PORT = 9998;
-        
+
         // Events for data received and connection status changes
         public event EventHandler<string>? DataReceived;
         public event EventHandler<bool>? ConnectionChanged;
-        
-        public int get_EasyOcrPort() => EASYOCR_PORT;
+
         public int get_PaddleOcrPort() => PADDLEOCR_PORT;
 
         // Singleton pattern
@@ -42,22 +40,22 @@ namespace ScreenTranslation
                 return _instance;
             }
         }
-        
+
         // Constructor
         private SocketManager()
         {
             _host = "localhost";
             // Get OCR method from ConfigManager
             string ocrMethod = ConfigManager.Instance.GetOcrMethod();
-            Console.WriteLine($"SocketManager initializing with OCR method: {ocrMethod}");
-            // Set port based on OCR method
+            System.Diagnostics.Debug.WriteLine($"SocketManager initializing with OCR method: {ocrMethod}");
+            // Set port based on OCR method (OneOCR doesn't use socket)
             _port = ocrMethod switch
             {
                 "PaddleOCR" => PADDLEOCR_PORT,
-                "EasyOCR" => EASYOCR_PORT,
-                _ => PADDLEOCR_PORT // Default to PADDLEOCR_PORT 
+                "OneOCR" => 0, // OneOCR doesn't use socket connection
+                _ => PADDLEOCR_PORT // Default to PADDLEOCR_PORT
             };
-            Console.WriteLine($"SocketManager initialized with port: {_port} for {ocrMethod}");
+            System.Diagnostics.Debug.WriteLine($"SocketManager initialized with port: {_port} for {ocrMethod}");
             _isConnected = false;
         }
 
@@ -67,13 +65,13 @@ namespace ScreenTranslation
             int newPort = ocrMethod switch
             {
                 "PaddleOCR" => PADDLEOCR_PORT,
-                "EasyOCR" => EASYOCR_PORT,
-                _ => PADDLEOCR_PORT // Default to PADDLEOCR_PORT 
+                "OneOCR" => 0, // OneOCR doesn't use socket connection
+                _ => PADDLEOCR_PORT // Default to PADDLEOCR_PORT
             };
 
             if (_port != newPort)
             {
-                Console.WriteLine($"Changing OCR server port from {_port} to {newPort} for {ocrMethod}");
+                System.Diagnostics.Debug.WriteLine($"Changing OCR server port from {_port} to {newPort} for {ocrMethod}");
                 SetPort(newPort);
             }
         }
@@ -89,7 +87,7 @@ namespace ScreenTranslation
                 //     Disconnect();
                 // }
                 _port = port;
-                Console.WriteLine($"OCR server port set to: {_port}");
+                System.Diagnostics.Debug.WriteLine($"OCR server port set to: {_port}");
             }
         }
 
@@ -106,16 +104,16 @@ namespace ScreenTranslation
             UpdatePortBasedOnOcrMethod(ocrMethod);
             if (_tryingToConnect) return;
 
-                 if (_isConnected && _clientSocket != null) 
-                {
-                    Console.WriteLine("Already connected, ignoring connect request");
-                    return;
-                }
-                
-                // Reset connection state to prevent state conflicts
-                _isConnected = false;
-                
-                Console.WriteLine($"Connecting to {_host}:{_port}...");
+            if (_isConnected && _clientSocket != null)
+            {
+                Console.WriteLine("Already connected, ignoring connect request");
+                return;
+            }
+
+            // Reset connection state to prevent state conflicts
+            _isConnected = false;
+
+            Console.WriteLine($"Connecting to {_host}:{_port}...");
 
             // If there's an existing socket, close it properly first
             if (_clientSocket != null)
@@ -130,26 +128,26 @@ namespace ScreenTranslation
                     _clientSocket = null;
                 }
             }
-                
-                // Initialize the socket
-                _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                
-                // Set socket options for reliability
-                _clientSocket.NoDelay = true; // Disable Nagle's algorithm
-                _clientSocket.ReceiveTimeout = 10000; // 10 second timeout
-                _clientSocket.SendTimeout = 10000; // 10 second timeout
-                
-                // Connect to the server
-                await _clientSocket.ConnectAsync(IPAddress.Parse("127.0.0.1"), _port);
-                
-                //_isConnected = true;
-                ConnectionChanged?.Invoke(this, true);
 
-                try
-                { 
+            // Initialize the socket
+            _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            // Set socket options for reliability
+            _clientSocket.NoDelay = true; // Disable Nagle's algorithm
+            _clientSocket.ReceiveTimeout = 10000; // 10 second timeout
+            _clientSocket.SendTimeout = 10000; // 10 second timeout
+
+            // Connect to the server
+            await _clientSocket.ConnectAsync(IPAddress.Parse("127.0.0.1"), _port);
+
+            //_isConnected = true;
+            ConnectionChanged?.Invoke(this, true);
+
+            try
+            {
                 // Start listening for incoming data
                 _ = StartListeningAsync();
-                
+
                 Console.WriteLine($"Connected to {_host}:{_port}");
                 // MainWindow.Instance.SetStatus($"Connected to {_host}:{_port}");
             }
@@ -159,30 +157,30 @@ namespace ScreenTranslation
                 _isConnected = false;
                 ConnectionChanged?.Invoke(this, false);
             }
-           
+
         }
-         public void Disconnect()
+        public void Disconnect()
         {
-           //disconnect
-           _isConnected = false;
+            //disconnect
+            _isConnected = false;
             ConnectionChanged?.Invoke(this, false);
             _clientSocket?.Close();
             _clientSocket?.Dispose();
             _clientSocket = null;
             _tryingToConnect = false;
         }
-        
+
         // Send data to server
         public async Task<bool> SendDataAsync(string data)
         {
-            if (!_isConnected || _clientSocket == null) 
+            if (!_isConnected || _clientSocket == null)
             {
                 Console.WriteLine("Not connected when trying to send data. Reconnect will be attempted automatically.");
                 // Signal that we're not connected - the reconnect timer in Logic will handle reconnection
                 ConnectionChanged?.Invoke(this, false);
                 return false;
             }
-            
+
             try
             {
                 byte[] messageBytes = Encoding.UTF8.GetBytes(data);
@@ -199,7 +197,7 @@ namespace ScreenTranslation
             }
             catch (ObjectDisposedException ex)
             {
-               
+
                 Console.WriteLine($"Socket was closed. Reconnect will be attempted automatically. {ex.Message}");
                 _isConnected = false;
                 ConnectionChanged?.Invoke(this, false);
@@ -213,12 +211,12 @@ namespace ScreenTranslation
                 return false;
             }
         }
-        
+
         // Listen for incoming data
         private async Task StartListeningAsync()
         {
             if (_clientSocket == null) return;
-            
+
             try
             {
                 while (_isConnected)
@@ -230,18 +228,18 @@ namespace ScreenTranslation
                         Array.Clear(_reusableSizeBuffer, 0, _reusableSizeBuffer.Length);
                         int sizeBytesRead = 0;
                         bool sizeComplete = false;
-                        
+
                         // Read until we find \r\n sequence
                         while (!sizeComplete && sizeBytesRead < _reusableSizeBuffer.Length && _clientSocket != null)
                         {
-                            
+
                             try
                             {
                                 // Read one byte at a time for reliable header detection
                                 int b = await _clientSocket.ReceiveAsync(
-                                    new ArraySegment<byte>(_reusableSizeBuffer, sizeBytesRead, 1), 
+                                    new ArraySegment<byte>(_reusableSizeBuffer, sizeBytesRead, 1),
                                     SocketFlags.None);
-                                
+
                                 if (b <= 0)
                                 {
                                     // Connection closed
@@ -250,12 +248,12 @@ namespace ScreenTranslation
                                     Console.WriteLine("Server disconnected (received 0 bytes)");
                                     break;
                                 }
-                                
+
                                 sizeBytesRead++;
-                                
+
                                 // Check for \r\n sequence
-                                if (sizeBytesRead >= 2 && 
-                                    _reusableSizeBuffer[sizeBytesRead - 2] == '\r' && 
+                                if (sizeBytesRead >= 2 &&
+                                    _reusableSizeBuffer[sizeBytesRead - 2] == '\r' &&
                                     _reusableSizeBuffer[sizeBytesRead - 1] == '\n')
                                 {
                                     sizeComplete = true;
@@ -278,33 +276,33 @@ namespace ScreenTranslation
                                 break;
                             }
                         }
-                        
+
                         if (!_isConnected || _clientSocket == null)
                         {
                             break; // Exit the outer loop if we're not connected anymore
                         }
-                        
+
                         if (!sizeComplete)
                         {
                             // Failed to get complete size header
                             Console.WriteLine("Failed to receive complete size header");
                             continue;
                         }
-                        
+
                         // Convert the size header to an integer
                         string sizeStr = Encoding.UTF8.GetString(_reusableSizeBuffer, 0, sizeBytesRead);
-                        
+
                         // Debug: Print all bytes in the size buffer for troubleshooting
                         //Console.WriteLine($"Size buffer content: {BitConverter.ToString(_reusableSizeBuffer, 0, Math.Min(100, sizeBytesRead))}");
-                        
+
                         if (!int.TryParse(sizeStr, out int messageSize))
                         {
                             Console.WriteLine($"Invalid size header: '{sizeStr}'");
                             continue;
                         }
-                        
+
                         //Console.WriteLine($"Expecting JSON response of {messageSize} bytes");
-                        
+
                         // Now receive the actual JSON message
                         // Use reusable buffer if message fits, otherwise allocate new one
                         byte[] jsonBuffer;
@@ -317,20 +315,20 @@ namespace ScreenTranslation
                             jsonBuffer = new byte[messageSize];
                         }
                         int jsonBytesRead = 0;
-                        
+
                         // Read until we have the entire message
                         while (jsonBytesRead < messageSize && _clientSocket != null)
                         {
                             try
                             {
                                 int remainingBytes = messageSize - jsonBytesRead;
-                                
+
                                 // Read in chunks of up to 4096 bytes
                                 int chunkSize = Math.Min(4096, remainingBytes);
                                 int b = await _clientSocket.ReceiveAsync(
-                                    new ArraySegment<byte>(jsonBuffer, jsonBytesRead, chunkSize), 
+                                    new ArraySegment<byte>(jsonBuffer, jsonBytesRead, chunkSize),
                                     SocketFlags.None);
-                                    
+
                                 if (b <= 0)
                                 {
                                     // Connection closed
@@ -339,7 +337,7 @@ namespace ScreenTranslation
                                     Console.WriteLine("Server disconnected during JSON read");
                                     break;
                                 }
-                                
+
                                 jsonBytesRead += b;
                             }
                             catch (SocketException sockEx)
@@ -357,25 +355,25 @@ namespace ScreenTranslation
                                 break;
                             }
                         }
-                        
-                        if (!_isConnected || _clientSocket == null )
+
+                        if (!_isConnected || _clientSocket == null)
                         {
                             break; // Exit the outer loop if we're not connected anymore
                         }
-                        
+
                         if (jsonBytesRead == messageSize)
                         {
                             // Successfully received the entire message
                             // Only decode the actual bytes received, not the entire buffer
                             string jsonData = Encoding.UTF8.GetString(jsonBuffer, 0, jsonBytesRead);
-                            
+
                             // For debugging, we'll still save the response to a file
                             try
                             {
                                 System.IO.File.WriteAllText("last_ocr_response.json", jsonData);
                             }
                             catch (Exception) { /* Ignore file saving errors */ }
-                            
+
                             // Raise the event with the received data
                             DataReceived?.Invoke(this, jsonData);
                         }
@@ -384,7 +382,7 @@ namespace ScreenTranslation
                             Console.WriteLine($"Incomplete message: received {jsonBytesRead} of {messageSize} bytes");
                         }
                     }
-                   
+
                     catch (SocketException sockEx)
                     {
                         Console.WriteLine($"Socket error in main listening loop: {sockEx.Message}");
@@ -406,7 +404,7 @@ namespace ScreenTranslation
                     }
                 }
             }
-          
+
             catch (Exception ex)
             {
                 Console.WriteLine($"Listening error: {ex.Message}");
@@ -418,10 +416,10 @@ namespace ScreenTranslation
                 Console.WriteLine("Listening loop has ended. Reconnect timer will attempt to reconnect if needed.");
             }
         }
-        
+
         // Check if connected
         public bool IsConnected => _isConnected;
-        
+
         // Get the port number
         public int GetPort() => _port;
 
@@ -446,7 +444,7 @@ namespace ScreenTranslation
 
             try
             {
-             
+
                 _isConnected = false;
 
                 // Small delay to ensure clean state

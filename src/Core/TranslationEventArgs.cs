@@ -1,5 +1,3 @@
-using System;
-
 namespace ScreenTranslation
 {
     public class TranslationEventArgs : EventArgs

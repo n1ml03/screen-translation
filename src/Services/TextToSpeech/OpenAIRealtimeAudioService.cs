@@ -1,12 +1,8 @@
-using System;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using NAudio.Wave;
-using System.IO;
 using System.Text.Json;
-using System.Collections.Generic;
+using NAudio.Wave;
 
 namespace ScreenTranslation
 {
@@ -160,7 +156,7 @@ namespace ScreenTranslation
                                         if (!string.IsNullOrEmpty(delta))
                                         {
                                             transcriptBuilder.Append(delta);
-                                          //  onResult(transcriptBuilder.ToString(), string.Empty);
+                                            //  onResult(transcriptBuilder.ToString(), string.Empty);
                                         }
                                     }
                                     break;

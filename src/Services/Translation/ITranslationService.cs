@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace ScreenTranslation
+﻿namespace ScreenTranslation
 {
     /// <summary>
     /// Interface for translation services to provide a common API for all translation providers

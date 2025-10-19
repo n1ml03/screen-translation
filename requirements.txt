@@ -1,0 +1,28 @@
+# Requirements for Screen Translation OCR servers
+# Install with: pip install -r requirements.txt
+#
+# Available OCR methods:
+# - PaddleOCR: Multi-language OCR with PaddlePaddle
+# - OneOCR: Windows Snipping Tool OCR (Windows 11 only)
+#
+# For GPU support with PaddleOCR, install CUDA-compatible versions:
+# pip install paddlepaddle-gpu
+
+# Core dependencies
+numpy
+pillow
+opencv-python
+matplotlib
+scipy
+tqdm
+pyyaml
+requests
+
+# PaddleOCR dependencies
+# Note: Use paddlepaddle-gpu if you have CUDA, otherwise use paddlepaddle
+# paddlepaddle-gpu>=2.4.0
+paddlepaddle
+paddleocr
+
+# OneOCR dependencies (Windows Snipping Tool OCR)
+oneocr

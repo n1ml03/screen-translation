@@ -1,1 +1,1 @@
-python server_paddle.py
+python app\webserver\PaddleOCR\server_paddle.py

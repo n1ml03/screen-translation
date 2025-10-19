@@ -1,27 +1,18 @@
-using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
 using System.Web;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using System.Media;
-using System.Collections.Concurrent;
+using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Colors = System.Windows.Media.Colors;
 using FontFamily = System.Windows.Media.FontFamily;
-using Brushes = System.Windows.Media.Brushes;
-using TextBox = System.Windows.Controls.TextBox;
-using WinCursors = System.Windows.Input.Cursors;
-using WinForms = System.Windows.Forms;
 
 namespace ScreenTranslation
 {
@@ -56,13 +47,13 @@ namespace ScreenTranslation
 
         // Semaphore to ensure only one speech request is processed at a time
         private static readonly SemaphoreSlim _speechSemaphore = new SemaphoreSlim(1, 1);
-        
+
         // Thread-safe queue for speech requests
         private static readonly ConcurrentQueue<string> _speechQueue = new ConcurrentQueue<string>();
-        
+
         // Flag to track if we're currently processing speech
         private static bool _isProcessingSpeech = false;
-        
+
         // Cancellation token source for speech processing
         private static CancellationTokenSource? _speechCancellationTokenSource;
 
@@ -231,18 +222,18 @@ namespace ScreenTranslation
 
             _isProcessingSpeech = true;
             Console.WriteLine("Starting speech queue processing");
-            
+
             try
             {
-                
+
                 await Task.Delay(5, cancellationToken);
-                
+
                 while (!_speechQueue.IsEmpty && !cancellationToken.IsCancellationRequested)
                 {
                     StringBuilder combinedText = new StringBuilder();
                     int queueSize = _speechQueue.Count;
                     Console.WriteLine($"Processing {queueSize} speech requests as one batch");
-                    
+
                     // Dequeue all items and combine them
                     while (_speechQueue.TryDequeue(out string? textToSpeak) && !cancellationToken.IsCancellationRequested)
                     {
@@ -253,21 +244,21 @@ namespace ScreenTranslation
                             {
                                 combinedText.Append(" ");
                             }
-                            
+
                             combinedText.Append(textToSpeak);
                         }
                     }
-                    
+
                     // If we have text to speak, process it as one request
                     if (combinedText.Length > 0 && !cancellationToken.IsCancellationRequested)
                     {
                         string finalText = combinedText.ToString();
                         Console.WriteLine($"Speaking combined text ({finalText.Length} chars): {finalText.Substring(0, Math.Min(50, finalText.Length))}...");
-                        
+
                         // Process the combined speech request
                         await Speak_Item_InternalAsync(finalText, cancellationToken);
                     }
-                    
+
                 }
             }
             catch (OperationCanceledException)
@@ -295,7 +286,7 @@ namespace ScreenTranslation
             {
                 // Process the text to remove line breaks and normalize spaces
                 string processedText = ProcessTextForSpeech(text);
-                
+
                 // Add the processed text to the queue
                 _speechQueue.Enqueue(processedText);
                 Console.WriteLine($"Speech request enqueued. Queue size: {_speechQueue.Count}");
@@ -308,10 +299,10 @@ namespace ScreenTranslation
                         _speechCancellationTokenSource.Cancel();
                         _speechCancellationTokenSource.Dispose();
                     }
-                    
+
                     // Create a new cancellation token source
                     _speechCancellationTokenSource = new CancellationTokenSource();
-                    
+
                     // Start the processing task
                     Task.Run(() => ProcessSpeechQueueAsync(_speechCancellationTokenSource.Token));
                 }
@@ -324,9 +315,9 @@ namespace ScreenTranslation
                         _speechCancellationTokenSource.Cancel();
                         _speechCancellationTokenSource.Dispose();
                         _speechCancellationTokenSource = new CancellationTokenSource();
-                        
+
                         _isProcessingSpeech = false;
-                        
+
                         Task.Run(() => ProcessSpeechQueueAsync(_speechCancellationTokenSource.Token));
                     }
                 }
@@ -342,16 +333,16 @@ namespace ScreenTranslation
         {
             if (string.IsNullOrWhiteSpace(text))
                 return string.Empty;
-            
+
             // Replace multiple newlines with a single space to reduce pauses
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\n+", ".");
-            
+
             // Replace multiple spaces with a single space
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-            
+
             // text = System.Text.RegularExpressions.Regex.Replace(text, @"\.{2,}", ".");
             // text = System.Text.RegularExpressions.Regex.Replace(text, @"\s*([.,;:!?])\s*", "$1 ");
-            
+
             return text.Trim();
         }
 
@@ -369,10 +360,10 @@ namespace ScreenTranslation
                 if (ConfigManager.Instance.IsTtsEnabled())
                 {
                     string ttsService = ConfigManager.Instance.GetTtsService();
-                    
+
                     // Wait to acquire the semaphore - this ensures only one speech request runs at a time
                     await _speechSemaphore.WaitAsync(cancellationToken);
-                    
+
                     try
                     {
                         bool success = await WindowsTTSService.Instance.SpeakText(trimmedText);
@@ -381,7 +372,7 @@ namespace ScreenTranslation
                         {
                             Console.WriteLine($"Failed to generate speech using {ttsService}");
                         }
-                        
+
                         return success;
                     }
                     finally
@@ -744,7 +735,7 @@ namespace ScreenTranslation
 
             // Update UI with existing history
             UpdateChatHistory();
-            
+
             if (!string.IsNullOrEmpty(translatedText) && ConfigManager.Instance.IsTtsEnabled())
             {
                 if (ConfigManager.Instance.IsExcludeCharacterNameEnabled())
@@ -1052,8 +1043,15 @@ namespace ScreenTranslation
                     para.TextIndent = 0;
                     para.LineHeight = Double.NaN; // Use default line height
 
-                    // Add original text based on display mode
-                    if ((_displayMode == 0 || _displayMode == 2) && !string.IsNullOrEmpty(entry.OriginalText))
+                    // Check if translation failed (translated text is same as original)
+                    bool translationFailed = !string.IsNullOrEmpty(entry.OriginalText) &&
+                                             !string.IsNullOrEmpty(entry.TranslatedText) &&
+                                             entry.OriginalText == entry.TranslatedText;
+
+                    // Add original text based on display mode, or when translation failed
+                    bool showOriginal = (_displayMode == 0 || _displayMode == 2) && !string.IsNullOrEmpty(entry.OriginalText);
+
+                    if (showOriginal || (translationFailed && (_displayMode == 0 || _displayMode == 1)))
                     {
                         // Create a run for the original text
                         string originalText = entry.OriginalText;
@@ -1066,8 +1064,9 @@ namespace ScreenTranslation
 
                         Run originalRun = new Run(originalText);
 
-                        // Format it appropriately
-                        originalRun.Foreground = GetCachedBrush(originalTextColor);
+                        // Format it appropriately - use translated text color if this is due to translation failure
+                        var textColor = translationFailed ? translatedTextColor : originalTextColor;
+                        originalRun.Foreground = GetCachedBrush(textColor);
                         originalRun.FontFamily = fontFamily;
                         originalRun.FontSize = Math.Max(fontSize - 2, 10);
 
@@ -1080,15 +1079,15 @@ namespace ScreenTranslation
                         para.Inlines.Add(originalRun);
 
                         // Add line breaks if there's also translated text to be shown
-                        if ((_displayMode == 0) && !string.IsNullOrEmpty(entry.TranslatedText))
+                        if ((_displayMode == 0) && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
                         {
                             para.Inlines.Add(new LineBreak());
                             para.Inlines.Add(new LineBreak());
                         }
                     }
 
-                    // Add translated text based on display mode
-                    if ((_displayMode == 0 || _displayMode == 1) && !string.IsNullOrEmpty(entry.TranslatedText))
+                    // Add translated text based on display mode (skip if translation failed)
+                    if ((_displayMode == 0 || _displayMode == 1) && !string.IsNullOrEmpty(entry.TranslatedText) && !translationFailed)
                     {
                         // Create a run for the translated text
                         string translatedText = entry.TranslatedText;

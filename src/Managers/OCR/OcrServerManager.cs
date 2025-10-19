@@ -1,7 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 
 namespace ScreenTranslation
 {
@@ -12,7 +10,7 @@ namespace ScreenTranslation
         public bool serverStarted = false;
 
         public bool timeoutStartServer = false;
-        
+
         // Singleton pattern
         public static OcrServerManager Instance
         {
@@ -25,12 +23,12 @@ namespace ScreenTranslation
                 return _instance;
             }
         }
-        
+
         private OcrServerManager()
         {
             // Private constructor for singleton
         }
-        
+
         /// <summary>
         /// Start OCR server
         /// </summary>
@@ -50,22 +48,7 @@ namespace ScreenTranslation
                 string batchFileName;
                 string workingDirectory;
 
-                if (ocrMethod == "EasyOCR")
-                {
-                    batchFileName = "RunServerEasyOCR.bat";
-                    workingDirectory = Path.Combine(webserverPath, "EasyOCR");
-                    flagFile = Path.Combine(Path.GetTempPath(), "easyocr_ready.txt");
-                    try
-                    {
-                        File.Delete(flagFile);
-                        Console.WriteLine("Delete temp file success");
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"Delete temp file fail {e.Message}");
-                    }
-                }
-                else if (ocrMethod == "PaddleOCR")
+                if (ocrMethod == "PaddleOCR")
                 {
                     batchFileName = "RunServerPaddleOCR.bat";
                     workingDirectory = Path.Combine(webserverPath, "PaddleOCR");
@@ -79,8 +62,6 @@ namespace ScreenTranslation
                     {
                         Console.WriteLine($"Delete temp file fail {e.Message}");
                     }
-
-
                 }
                 else
                 {
@@ -145,7 +126,7 @@ namespace ScreenTranslation
                 return false;
             }
         }
-        
+
         /// <summary>
         /// Stop the OCR server if it's running
         /// </summary>
@@ -155,7 +136,6 @@ namespace ScreenTranslation
             {
                 if (_currentServerProcess != null && !_currentServerProcess.HasExited)
                 {
-                    KillProcessesByPort(SocketManager.Instance.get_EasyOcrPort());
                     KillProcessesByPort(SocketManager.Instance.get_PaddleOcrPort());
                     MainWindow.Instance.UpdateServerButtonStatus(OcrServerManager.Instance.serverStarted);
                     // Get the process ID of the current server process
@@ -180,14 +160,14 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error stopping OCR server: {ex.Message}");
             }
         }
-        
+
 
         public void KillProcessesByPort(int port)
         {
             try
             {
                 Console.WriteLine($"Looking for processes using port {port}...");
-                
+
 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -219,7 +199,7 @@ namespace ScreenTranslation
                     foreach (string line in output.Split('\n'))
                     {
                         if (string.IsNullOrWhiteSpace(line)) continue;
-                        
+
 
                         string[] parts = line.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length > 4)
@@ -248,78 +228,6 @@ namespace ScreenTranslation
         }
 
 
-        
 
-        /// <summary>
-        /// Setup environment for OCR using pure Python (no conda required)
-        /// </summary>
-        /// <param name="ocrMethod">OCR method ("EasyOCR" or "PaddleOCR")</param>
-        public bool SetupOcrEnvironment(string ocrMethod)
-        {
-            try
-            {
-                // Get the base directory of the application
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string webserverPath = Path.Combine(baseDirectory, "webserver");
-
-                // Check if setup script exists
-                string setupScriptPath = Path.Combine(webserverPath, "setup_environment.py");
-                if (!File.Exists(setupScriptPath))
-                {
-                    Console.WriteLine($"Setup script not found: {setupScriptPath}");
-                    return false;
-                }
-
-                Console.WriteLine($"Setting up {ocrMethod} environment...");
-
-                // Initialize process start info for Python script
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "python",
-                    Arguments = $"\"{setupScriptPath}\" {ocrMethod.ToLower()}",
-                    WorkingDirectory = webserverPath,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = false
-                };
-
-                // Start the process
-                using (Process? setupProcess = Process.Start(startInfo))
-                {
-                    if (setupProcess == null)
-                    {
-                        Console.WriteLine("Unable to start the Python setup script");
-                        return false;
-                    }
-
-                    // Read output in real-time
-                    string output = setupProcess.StandardOutput.ReadToEnd();
-                    string error = setupProcess.StandardError.ReadToEnd();
-
-                    // Wait for the process to finish
-                    setupProcess.WaitForExit();
-
-                    Console.WriteLine("Setup output:");
-                    Console.WriteLine(output);
-
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        Console.WriteLine("Setup errors:");
-                        Console.WriteLine(error);
-                    }
-
-                    bool success = setupProcess.ExitCode == 0;
-                    Console.WriteLine($"The {ocrMethod} setup process has been completed - {(success ? "SUCCESS" : "FAILED")}");
-
-                    return success;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error when setting up OCR environment: {ex.Message}");
-                return false;
-            }
-        }
     }
 }

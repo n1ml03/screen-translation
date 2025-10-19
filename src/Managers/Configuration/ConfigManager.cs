@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Globalization;
 using System.Windows;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -16,7 +12,6 @@ namespace ScreenTranslation
     {
         private static ConfigManager? _instance;
         private readonly string _configFilePath;
-        public readonly string _profileFolderPath;
         private readonly string _chatgptConfigFilePath;
         private readonly Dictionary<string, string> _configValues;
         private string _currentTranslationService = "ChatGPT"; // Default to ChatGPT
@@ -74,7 +69,7 @@ namespace ScreenTranslation
         public const string AUTO_TRANSLATE_ENABLED = "auto_translate_enabled";
         public const string CHAR_LEVEL = "char_level";
         public const string IGNORE_PHRASES = "ignore_phrases";
-        public const string WINDOWS_OCR_INTEGRATION = "windows_ocr_integration";
+        public const string ONEOCR_INTEGRATION = "oneocr_integration";
         public const string AUTO_OCR = "auto_ocr";
 
         // Text-to-Speech configuration keys
@@ -154,11 +149,9 @@ namespace ScreenTranslation
             // Set config file paths to be in the application's directory
             string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
             _configFilePath = Path.Combine(appDirectory, "config.txt");
-            _profileFolderPath = Path.Combine(appDirectory, "Profiles");
             _chatgptConfigFilePath = Path.Combine(appDirectory, "chatgpt_config.txt");
 
             Console.WriteLine($"Config file path: {_configFilePath}");
-            Console.WriteLine($"Profile folder path: {_profileFolderPath}");
             Console.WriteLine($"ChatGPT config file path: {_chatgptConfigFilePath}");
 
             // Load main config values
@@ -199,7 +192,7 @@ namespace ScreenTranslation
         // Load configuration from file
         private void LoadConfig(string filePath = "Default")
         {
-            if(filePath == "Default")
+            if (filePath == "Default")
             {
                 filePath = _configFilePath;
             }
@@ -208,7 +201,7 @@ namespace ScreenTranslation
                 // Create default config if it doesn't exist
                 if (!File.Exists(filePath))
                 {
-                    Console.WriteLine("Configuration file not found. Creating default configuration.");
+                    System.Diagnostics.Debug.WriteLine("Configuration file not found. Creating default configuration.");
                     CreateDefaultConfig();
                 }
                 else
@@ -225,26 +218,29 @@ namespace ScreenTranslation
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading config: {ex.Message}");
-                MessageBox.Show($"Error loading configuration: {ex.Message}", "Configuration Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Diagnostics.Debug.WriteLine($"Error loading config: {ex.Message}");
+                // Show user-friendly error message without blocking UI
+                if (Application.Current?.Dispatcher?.CheckAccess() == true)
+                {
+                    MessageBox.Show($"Error loading configuration: {ex.Message}", "Configuration Error",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
 
             // Debug output: dump all loaded config values
-            Console.WriteLine("=== All Loaded Config Values ===");
+            System.Diagnostics.Debug.WriteLine("=== All Loaded Config Values ===");
             foreach (var entry in _configValues)
             {
-                Console.WriteLine($"  {entry.Key} = {(entry.Key.Contains("api_key") ? "***" : entry.Value)}");
+                System.Diagnostics.Debug.WriteLine($"  {entry.Key} = {(entry.Key.Contains("api_key") || entry.Key.Contains("password") ? "***" : entry.Value)}");
             }
-            Console.WriteLine("===============================");
+            System.Diagnostics.Debug.WriteLine("===============================");
         }
 
 
 
-        // Create default configuration
-        private void CreateDefaultConfig()
+        // Set default UI-related configuration values
+        private void SetDefaultUIConfig()
         {
-            // Set default values based on current config.txt
             _configValues[AUTO_SIZE_TEXT_BLOCKS] = "true";
             _configValues[CHATBOX_FONT_FAMILY] = "Segoe UI";
             _configValues[CHATBOX_FONT_SIZE] = "15";
@@ -257,34 +253,59 @@ namespace ScreenTranslation
             _configValues[CHATBOX_BACKGROUND_OPACITY] = "0.35";
             _configValues[CHATBOX_WINDOW_OPACITY] = "1";
             _configValues[CHATBOX_MIN_TEXT_SIZE] = "2";
+            _configValues[OVERLAY_BACKGROUND_COLOR] = "#FF000000";
+            _configValues[OVERLAY_TEXT_COLOR] = "#FFFFFFFF";
+        }
+
+        // Set default translation and language configuration values
+        private void SetDefaultTranslationConfig()
+        {
             _configValues[TRANSLATION_SERVICE] = "ChatGPT";
-            _configValues[OCR_METHOD] = "Windows OCR";
             _configValues[SOURCE_LANGUAGE] = "en";
             _configValues[TARGET_LANGUAGE] = "vi";
-            _configValues[TTS_SERVICE] = "Windows TTS";
-            _configValues[WINDOWS_TTS_VOICE ] = "Microsoft David (en-US, Male)";
-            _configValues[TTS_ENABLED] = "false";
             _configValues[MAX_CONTEXT_PIECES] = "20";
             _configValues[MIN_CONTEXT_SIZE] = "8";
             _configValues[GAME_INFO] = "We're playing an unspecified game.";
+            _configValues[AUTO_TRANSLATE_ENABLED] = "true";
+            _configValues[TEXTSIMILAR_THRESHOLD] = "0.75";
+        }
+
+        // Set default OCR configuration values
+        private void SetDefaultOCRConfig()
+        {
+            _configValues[OCR_METHOD] = "OneOCR";
             _configValues[MIN_TEXT_FRAGMENT_SIZE] = "1";
-            _configValues[CHATGPT_MODEL] = "gpt-41-nano";
+            _configValues[BLOCK_DETECTION_SCALE] = "3.00";
+            _configValues[BLOCK_DETECTION_SETTLE_TIME] = "0.15";
+            _configValues[MIN_LETTER_CONFIDENCE] = "0.1";
+            _configValues[MIN_LINE_CONFIDENCE] = "0.1";
+            _configValues[CHAR_LEVEL] = "true";
+            _configValues[IGNORE_PHRASES] = "";
+            _configValues[ONEOCR_INTEGRATION] = "false";
+            _configValues[AUTO_OCR] = "true";
+        }
+
+        // Set default TTS configuration values
+        private void SetDefaultTTSConfig()
+        {
+            _configValues[TTS_SERVICE] = "Windows TTS";
+            _configValues[WINDOWS_TTS_VOICE] = "Microsoft David (en-US, Male)";
+            _configValues[TTS_ENABLED] = "false";
+            _configValues[EXCLUDE_CHARACTER_NAME] = "false";
+        }
+
+        // Set default ChatGPT configuration values
+        private void SetDefaultChatGPTConfig()
+        {
+            _configValues[CHATGPT_MODEL] = "41-nano-ktv";
             _configValues[CHATGPT_USERNAME] = "<your username here>";
             _configValues[CHATGPT_ENDPOINT] = "<your endpoint here>";
             _configValues[CHATGPT_PASSWORD] = "<your password here>";
-            _configValues[BLOCK_DETECTION_SCALE] = "3.00";
-            _configValues[BLOCK_DETECTION_SETTLE_TIME] = "0.15";
-            _configValues[KEEP_TRANSLATED_TEXT_UNTIL_REPLACED] = "true";
-            _configValues[LEAVE_TRANSLATION_ONSCREEN] = "true";
-            _configValues[MIN_LETTER_CONFIDENCE] = "0.1";
-            _configValues[MIN_LINE_CONFIDENCE] = "0.1";
-            _configValues[AUTO_TRANSLATE_ENABLED] = "true";
-            _configValues[CHAR_LEVEL] = "true";
-            _configValues[IGNORE_PHRASES] = "";
-            _configValues[TEXTSIMILAR_THRESHOLD] = "0.75";
-            _configValues[OVERLAY_BACKGROUND_COLOR] = "#FF000000";
-            _configValues[OVERLAY_TEXT_COLOR] = "#FFFFFFFF";
-            _configValues[MULTI_SELECTION_AREA] = "false";
+        }
+
+        // Set default hotkey configuration values
+        private void SetDefaultHotkeyConfig()
+        {
             _configValues[HOTKEY_START_STOP] = "ALT+G";
             _configValues[HOTKEY_OVERLAY] = "ALT+F";
             _configValues[HOTKEY_SETTING] = "ALT+P";
@@ -298,16 +319,34 @@ namespace ScreenTranslation
             _configValues[HOTKEY_AREA_3] = "ALT+3";
             _configValues[HOTKEY_AREA_4] = "ALT+4";
             _configValues[HOTKEY_AREA_5] = "ALT+5";
+        }
+
+        // Set default miscellaneous configuration values
+        private void SetDefaultMiscConfig()
+        {
+            _configValues[KEEP_TRANSLATED_TEXT_UNTIL_REPLACED] = "true";
+            _configValues[LEAVE_TRANSLATION_ONSCREEN] = "true";
+            _configValues[MULTI_SELECTION_AREA] = "false";
             _configValues[SHOW_ICON_SIGNAL] = "true";
             _configValues[SEND_DATA_TO_SERVER] = "false";
-            _configValues[WINDOWS_OCR_INTEGRATION] = "false";
-            _configValues[AUTO_OCR] = "true";
-            _configValues[EXCLUDE_CHARACTER_NAME] = "false";
             _configValues[SHOW_QUICK_START] = "true";
+        }
+
+        // Create default configuration
+        private void CreateDefaultConfig()
+        {
+            // Set default values by category for better organization
+            SetDefaultUIConfig();
+            SetDefaultTranslationConfig();
+            SetDefaultOCRConfig();
+            SetDefaultTTSConfig();
+            SetDefaultChatGPTConfig();
+            SetDefaultHotkeyConfig();
+            SetDefaultMiscConfig();
 
             // Save the default configuration
             SaveConfig();
-            Console.WriteLine("Default configuration created and saved.");
+            System.Diagnostics.Debug.WriteLine("Default configuration created and saved.");
         }
 
         // Process multiline values enclosed in tags
@@ -331,13 +370,13 @@ namespace ScreenTranslation
                         // Store the value
                         _configValues[key] = value;
 
-                        Console.WriteLine($"Loaded multiline config: {key} ({value.Length} chars)");
+                        System.Diagnostics.Debug.WriteLine($"Loaded multiline config: {key} ({value.Length} chars)");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error parsing multiline values: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error parsing multiline values: {ex.Message}");
             }
         }
 
@@ -401,7 +440,7 @@ namespace ScreenTranslation
         }
 
         // Save configuration to file
-        public void SaveConfig(string filePath="Default")
+        public void SaveConfig(string filePath = "Default")
         {
             try
             {
@@ -513,7 +552,7 @@ namespace ScreenTranslation
                     byte b = Convert.ToByte(colorHex.Substring(startIndex + 4, 2), 16);
 
                     System.Windows.Media.Color color = System.Windows.Media.Color.FromArgb(a, r, g, b);
-                    
+
                     // Cache the result
                     _colorCache[colorHex] = color;
                     return color;
@@ -715,7 +754,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"  Config key: '{key}'");
             }
 
-            string ocrMethod = GetValue(OCR_METHOD, "Windows OCR"); // Default to Windows OCR if not set
+            string ocrMethod = GetValue(OCR_METHOD, "OneOCR"); // Default to OneOCR if not set
             Console.WriteLine($"ConfigManager.GetOcrMethod() returning: '{ocrMethod}'");
             return ocrMethod;
         }
@@ -724,7 +763,7 @@ namespace ScreenTranslation
         public void SetOcrMethod(string method)
         {
             Console.WriteLine($"ConfigManager.SetOcrMethod called with method: {method}");
-            if (method == "Windows OCR" || method == "EasyOCR" || method == "PaddleOCR")
+            if (method == "OneOCR" || method == "PaddleOCR")
             {
                 _configValues[OCR_METHOD] = method;
                 SaveConfig();
@@ -732,7 +771,7 @@ namespace ScreenTranslation
             }
             else
             {
-                Console.WriteLine($"WARNING: Invalid OCR method: {method}. Must be 'Windows OCR' or 'EasyOCR' or 'PaddleOCR'");
+                Console.WriteLine($"WARNING: Invalid OCR method: {method}. Must be 'PaddleOCR' or 'OneOCR'");
             }
         }
 
@@ -1330,17 +1369,17 @@ namespace ScreenTranslation
             Console.WriteLine($"Auto OCR enabled: {enabled}");
         }
 
-        // Get/Set windows OCR integration status
-        public bool IsWindowsOCRIntegrationEnabled()
+        // Get/Set OneOCR integration status
+        public bool IsOneOCRIntegrationEnabled()
         {
-            string value = GetValue(WINDOWS_OCR_INTEGRATION, "false");
+            string value = GetValue(ONEOCR_INTEGRATION, "true");
             return value.ToLower() == "true";
         }
-        public void SetWindowsOCRIntegration(bool enabled)
+        public void SetOneOCRIntegration(bool enabled)
         {
-            _configValues[WINDOWS_OCR_INTEGRATION] = enabled.ToString().ToLower();
+            _configValues[ONEOCR_INTEGRATION] = enabled.ToString().ToLower();
             SaveConfig();
-            Console.WriteLine($"Windows OCR integration enabled: {enabled}");
+            Console.WriteLine($"OneOCR integration enabled: {enabled}");
         }
 
         // Get/Set TTS enabled
@@ -1448,7 +1487,7 @@ namespace ScreenTranslation
         // Get/Set ChatGPT model
         public string GetChatGptModel()
         {
-            return GetValue(CHATGPT_MODEL, "gpt-3.5-turbo"); // Default to gpt-3.5-turbo
+            return GetValue(CHATGPT_MODEL, "41-nano-ktv"); // Default to 41-nano-ktv
         }
 
         public void SetChatGptModel(string? model)
@@ -1730,11 +1769,11 @@ namespace ScreenTranslation
             }
 
             _configValues[IGNORE_PHRASES] = sb.ToString();
-            
+
             // Invalidate cache
             _cachedIgnorePhrases = null;
             _lastIgnorePhrasesValue = null;
-            
+
             SaveConfig();
             Console.WriteLine($"Saved {phrases.Count} ignore phrases: {sb.ToString()}");
         }
@@ -1824,83 +1863,6 @@ namespace ScreenTranslation
             SaveConfig();
             Console.WriteLine($"Audio service auto-translate enabled: {enabled}");
         }
-        
-        // Save translation areas to config
-        public void SaveTranslationAreas(List<Rect> areas, string profileName)
-        {
-            try
-            {
-                // Format: X1,Y1,Width1,Height1|X2,Y2,Width2,Height2|...
-                StringBuilder sb = new StringBuilder();
 
-                foreach (var area in areas)
-                {
-                    // Use invariant culture to ensure consistent decimal formatting
-                    sb.Append(area.X.ToString(CultureInfo.InvariantCulture));
-                    sb.Append(',');
-                    sb.Append(area.Y.ToString(CultureInfo.InvariantCulture));
-                    sb.Append(',');
-                    sb.Append(area.Width.ToString(CultureInfo.InvariantCulture));
-                    sb.Append(',');
-                    sb.Append(area.Height.ToString(CultureInfo.InvariantCulture));
-                    sb.Append('+');
-                }
-
-                // Save to config
-                _configValues[TRANSLATION_AREAS] = sb.ToString();
-
-                string pathProfile = Path.Combine(_profileFolderPath, $"{profileName}.txt");
-                // Save config to file
-                SaveConfig(pathProfile);
-
-                Console.WriteLine($"Saved {areas.Count} translation areas to config");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error saving translation areas: {ex.Message}");
-            }
-        }
-
-        
-        // Get translation areas from config
-        public List<Rect> GetTranslationAreas(string filePath)
-        {
-            List<Rect> areas = new List<Rect>();
-            LoadConfig(filePath);
-            try
-            {
-                string value = GetValue(TRANSLATION_AREAS, "");
-
-                if (!string.IsNullOrEmpty(value))
-                {
-                    string[] areaStrings = value.Split(new[] { '+' }, StringSplitOptions.RemoveEmptyEntries);
-
-                    foreach (string areaString in areaStrings)
-                    {
-                        string[] parts = areaString.Split(',');
-
-                        if (parts.Length == 4)
-                        {
-                            // Parse using invariant culture to handle different decimal separators
-                            if (double.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out double x) &&
-                                double.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out double y) &&
-                                double.TryParse(parts[2], NumberStyles.Any, CultureInfo.InvariantCulture, out double width) &&
-                                double.TryParse(parts[3], NumberStyles.Any, CultureInfo.InvariantCulture, out double height))
-                            {
-                                areas.Add(new Rect(x, y, width, height));
-                            }
-                        }
-                    }
-                }
-
-                Console.WriteLine($"Loaded {areas.Count} translation areas from config");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading translation areas: {ex.Message}");
-            }
-
-            return areas;
-        }
     }
 }

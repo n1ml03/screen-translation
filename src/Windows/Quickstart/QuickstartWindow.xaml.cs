@@ -1,13 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-using Color = System.Windows.Media.Color;
 using Button = System.Windows.Controls.Button;
+using Color = System.Windows.Media.Color;
 
 namespace ScreenTranslation
 {
@@ -184,18 +180,22 @@ namespace ScreenTranslation
             Button? button = sender as Button;
             if (button != null && button.Tag != null)
             {
-                string[] languages = button.Tag.ToString().Split(',');
-                if (languages.Length == 2)
+                string? tagString = button.Tag.ToString();
+                if (tagString != null)
                 {
-                    // Find and select the languages in the comboboxes
-                    SourceLanguageComboBox.SelectedItem = languages[0];
-                    TargetLanguageComboBox.SelectedItem = languages[1];
-                }
-                else
-                {
-                    // Default language select 
-                    SourceLanguageComboBox.SelectedItem = "en";
-                    TargetLanguageComboBox.SelectedItem = "vi";
+                    string[] languages = tagString.Split(',');
+                    if (languages.Length == 2)
+                    {
+                        // Find and select the languages in the comboboxes
+                        SourceLanguageComboBox.SelectedItem = languages[0];
+                        TargetLanguageComboBox.SelectedItem = languages[1];
+                    }
+                    else
+                    {
+                        // Default language select
+                        SourceLanguageComboBox.SelectedItem = "en";
+                        TargetLanguageComboBox.SelectedItem = "vi";
+                    }
                 }
             }
         }
@@ -211,70 +211,25 @@ namespace ScreenTranslation
 
             // Populate OCR method dropdown
             OcrMethodComboBox.Items.Clear();
-            OcrMethodComboBox.Items.Add("Windows OCR");
-            OcrMethodComboBox.Items.Add("EasyOCR");
+            OcrMethodComboBox.Items.Add("OneOCR");
             OcrMethodComboBox.Items.Add("PaddleOCR");
 
             // Set current selection
             switch (ocrMethod.ToLower())
             {
-                case "windows ocr":
-                    OcrMethodComboBox.SelectedItem = "Windows OCR";
-                    break;
-                case "easyocr":
-                    OcrMethodComboBox.SelectedItem = "EasyOCR";
+                case "oneocr":
+                    OcrMethodComboBox.SelectedItem = "OneOCR";
                     break;
                 case "paddleocr":
                     OcrMethodComboBox.SelectedItem = "PaddleOCR";
                     break;
                 default:
-                    OcrMethodComboBox.SelectedItem = "Windows OCR";
+                    OcrMethodComboBox.SelectedItem = "OneOCR";
                     break;
             }
             LoadedOcrSettings = true;
         }
 
-        private async void SetupOcrServer_Click(object sender, RoutedEventArgs e)
-        {
-            Button? button = sender as Button;
-            if (button != null)
-            {
-                string? ocrMethod = OcrMethodComboBox.SelectedItem.ToString();
-                setupOCR.Content = $"Setup OCR Server for {ocrMethod}";
-                if (string.IsNullOrEmpty(ocrMethod))
-                {
-                    ocrMethod = "Windows OCR";
-                }
-
-                if (ocrMethod == "Windows OCR")
-                {
-                    System.Windows.MessageBox.Show($"{ocrMethod} doesn't require installing a environment.", "Warning!!", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                // Show setup dialog
-                MessageBoxResult result = System.Windows.MessageBox.Show(
-                    $"Are you sure you want to install the environment for {ocrMethod}?\n\n" +
-                    "This process may take a long time and requires an internet connection",
-                    "Confirm installation",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-
-                    // Run setup
-                    await Task.Run(() =>
-                    {
-                        OcrServerManager.Instance.SetupOcrEnvironment(ocrMethod);
-                    });
-
-                }
-                // Select this OCR method in the ComboBox
-                OcrMethodComboBox.SelectedItem = ocrMethod;
-            }
-
-        }
 
 
 
@@ -309,9 +264,9 @@ namespace ScreenTranslation
 
             // Load ChatGPT models
             ChatGptModelComboBox.Items.Clear();
-            ChatGptModelComboBox.Items.Add("gpt-41-nano");
-            ChatGptModelComboBox.Items.Add("gpt-41-mini");
-            ChatGptModelComboBox.Items.Add("gpt-41");
+            ChatGptModelComboBox.Items.Add("41-nano-ktv");
+            ChatGptModelComboBox.Items.Add("41-mini-ktv");
+            ChatGptModelComboBox.Items.Add("41-ktv");
 
             // Set selected ChatGPT model
             string chatGptModel = configManager.GetChatGptModel();
@@ -321,7 +276,7 @@ namespace ScreenTranslation
             }
             else
             {
-                ChatGptModelComboBox.SelectedItem = "gpt-41-nano";
+                ChatGptModelComboBox.SelectedItem = "41-nano-ktv";
             }
 
             // Update visibility of API key fields based on selected service
@@ -428,7 +383,7 @@ namespace ScreenTranslation
             // Get settings from config
             string sourceLanguage = SourceLanguageComboBox.SelectedItem.ToString() ?? "en";
             string targetLanguage = TargetLanguageComboBox.SelectedItem.ToString() ?? "vi";
-            string ocrMethod = OcrMethodComboBox.SelectedItem.ToString() ?? "Windows OCR";
+            string ocrMethod = OcrMethodComboBox.SelectedItem.ToString() ?? "OneOCR";
             string translationService = TranslationServiceComboBox.SelectedItem.ToString() ?? "Google translate";
 
             // Format language display
@@ -439,17 +394,14 @@ namespace ScreenTranslation
             // Format OCR method display
             switch (ocrMethod.ToLower())
             {
-                case "windowsocr":
-                    OcrMethodSummaryText.Text = "Windows OCR";
-                    break;
-                case "easyocr":
-                    OcrMethodSummaryText.Text = "EasyOCR";
+                case "oneocr":
+                    OcrMethodSummaryText.Text = "OneOCR";
                     break;
                 case "paddleocr":
                     OcrMethodSummaryText.Text = "PaddleOCR";
                     break;
                 default:
-                    OcrMethodSummaryText.Text = "Windows OCR";
+                    OcrMethodSummaryText.Text = "OneOCR";
                     break;
             }
 
@@ -520,8 +472,8 @@ namespace ScreenTranslation
             configManager.SetTargetLanguage(TargetLanguageComboBox.SelectedItem.ToString() ?? "vi");
 
             // Save setting OCR method
-            configManager.SetOcrMethod(OcrMethodComboBox.SelectedItem.ToString() ?? "Windows OCR");
-            MainWindow.Instance.SetOcrMethod(OcrMethodComboBox.SelectedItem.ToString() ?? "Windows OCR");
+            configManager.SetOcrMethod(OcrMethodComboBox.SelectedItem.ToString() ?? "OneOCR");
+            MainWindow.Instance.SetOcrMethod(OcrMethodComboBox.SelectedItem.ToString() ?? "OneOCR");
 
             // Save setting translation services
             configManager.SetTranslationService(TranslationServiceComboBox.SelectedItem.ToString() ?? "Google translate");

@@ -1,12 +1,11 @@
 using System.IO;
-using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using System.Windows.Interop;
-using System.Runtime.InteropServices;
 
 
 namespace ScreenTranslation
@@ -30,7 +29,7 @@ namespace ScreenTranslation
         private double currentZoom = 1.0;
         private const double zoomIncrement = 0.1;
         private string lastImagePath = string.Empty;
-        
+
         // Singleton pattern to match application style
         private static MonitorWindow? _instance;
         public static MonitorWindow Instance
@@ -114,7 +113,7 @@ namespace ScreenTranslation
                 Console.WriteLine("Exclude MonitorWindow from capture success");
             }
         }
-        
+
         // Add a new method to handle SourceInitialized event
         private void MonitorWindow_SourceInitialized(object? sender, EventArgs e)
         {
@@ -139,11 +138,11 @@ namespace ScreenTranslation
 
         // Flag to prevent saving during initialization
         private static bool _isInitializing = true;
-        
+
         // Timer for updating translation status
         private DispatcherTimer? _translationStatusTimer;
         private DateTime _translationStartTime;
-        
+
         // OCR Method Selection Changed
         public void OcrMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -154,30 +153,30 @@ namespace ScreenTranslation
                 Console.WriteLine("Skipping OCR method change during initialization");
                 return;
             }
-            
+
             if (ocrMethodComboBox.SelectedItem == null) return;
-            
+
             string? ocrMethod = (ocrMethodComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString();
             if (string.IsNullOrEmpty(ocrMethod)) return;
-            
+
             // Reset the OCR hash to force a fresh comparison after changing OCR method
             Logic.Instance.ResetHash();
-            
+
             Console.WriteLine($"OCR method changed to: {ocrMethod}");
-            
+
             // Clear any existing text objects
             Logic.Instance.ClearAllTextObjects();
-            
+
             // Update the UI and connection state based on the selected OCR method
-            if (ocrMethod == "Windows OCR")
+            if (ocrMethod == "OneOCR")
             {
-                // Using Windows OCR, no need for socket connection
-                _ = Task.Run(() => 
+                // Using OneOCR, no need for socket connection
+                _ = Task.Run(() =>
                 {
                     try
                     {
-                       SocketManager.Instance.Disconnect();
-                        UpdateStatus("Using Windows OCR (built-in)");
+                        SocketManager.Instance.Disconnect();
+                        UpdateStatus("Using OneOCR (built-in)");
                     }
                     catch (Exception ex)
                     {
@@ -188,43 +187,43 @@ namespace ScreenTranslation
             else
             {
                 try
-                    {
-                       SocketManager.Instance.Disconnect();
-                        UpdateStatus($"Using {ocrMethod}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error disconnecting socket: {ex.Message}");
-                    }
-                // Using EasyOCR or PaddleOCR, check connection status first
-                _ = Task.Run(async () => 
                 {
-                   
-                        Console.WriteLine("Switching to new OCR, checking socket connection...");
+                    SocketManager.Instance.Disconnect();
+                    UpdateStatus($"Using {ocrMethod}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error disconnecting socket: {ex.Message}");
+                }
+                // Using PaddleOCR, check connection status first
+                _ = Task.Run(async () =>
+                {
 
-                        // If already connected, we're good to go
-                        if (SocketManager.Instance.IsConnected)
-                        {
-                            Console.WriteLine("Already connected to socket server");
-                            UpdateStatus("Connected to Python backend");
-                            return;
-                        }
+                    Console.WriteLine("Switching to new OCR, checking socket connection...");
 
-                        // Not connected yet, attempt to connect silently first
-                        UpdateStatus("Connecting to Python backend...");
+                    // If already connected, we're good to go
+                    if (SocketManager.Instance.IsConnected)
+                    {
+                        Console.WriteLine("Already connected to socket server");
+                        UpdateStatus("Connected to Python backend");
+                        return;
+                    }
 
-                        // Connect without disconnecting first (TryReconnectAsync handles cleanup)
-                        bool reconnected = await SocketManager.Instance.TryReconnectAsync();
-                   
+                    // Not connected yet, attempt to connect silently first
+                    UpdateStatus("Connecting to Python backend...");
+
+                    // Connect without disconnecting first (TryReconnectAsync handles cleanup)
+                    bool reconnected = await SocketManager.Instance.TryReconnectAsync();
+
                 });
             }
-            
+
             // Sync the OCR method selection with MainWindow
             if (MainWindow.Instance != null)
             {
                 MainWindow.Instance.SetOcrMethod(ocrMethod);
             }
-            
+
             // Only save if not initializing
             if (!_isInitializing)
             {
@@ -236,42 +235,42 @@ namespace ScreenTranslation
                 Console.WriteLine($"Skipping save during initialization for OCR method: '{ocrMethod}'");
             }
         }
-        
+
         // Auto Translate Checkbox Changed
         private void AutoTranslateCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
         {
             bool isAutoTranslateEnabled = autoTranslateCheckBox.IsChecked ?? false;
-            
+
             Console.WriteLine($"Auto-translate {(isAutoTranslateEnabled ? "enabled" : "disabled")}");
-            
+
             // Clear text objects
             Logic.Instance.ClearAllTextObjects();
             Logic.Instance.ResetHash();
-            
+
             // Force OCR to run again
             MainWindow.Instance.SetOCRCheckIsWanted(true);
-            
+
             // Refresh overlays
             RefreshOverlays();
-            
+
             // Sync the checkbox state with MainWindow
             if (MainWindow.Instance != null)
             {
                 MainWindow.Instance.SetAutoTranslateEnabled(isAutoTranslateEnabled);
             }
         }
-        
+
         private void MonitorWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("MonitorWindow_Loaded: Starting initialization");
-            
+
             // Set initialization flag to true to prevent saving during setup
             _isInitializing = true;
-            
+
             // Make sure keyboard shortcuts work from this window too
             PreviewKeyDown -= Application_KeyDown;
             PreviewKeyDown += Application_KeyDown;
-            
+
             // Try to load the last screenshot if available
             if (!string.IsNullOrEmpty(lastImagePath) && File.Exists(lastImagePath))
             {
@@ -357,23 +356,23 @@ namespace ScreenTranslation
 
                 GetDpiScale();
             }
-            
+
             Console.WriteLine("MonitorWindow initialization complete");
         }
-        
+
         // Handler for application-level keyboard shortcuts
         private void Application_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             // Forward to the central keyboard shortcuts handler
             KeyboardShortcuts.HandleKeyDown(e);
         }
-        
+
         private void MonitorWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             // Update scrollbars when window size changes
             UpdateScrollViewerSettings();
         }
-        
+
         // Update the monitor with a bitmap directly (no file saving required)
         public void UpdateScreenshotFromBitmap(System.Drawing.Bitmap bitmap)
         {
@@ -392,7 +391,7 @@ namespace ScreenTranslation
                             IntPtr.Zero,
                             Int32Rect.Empty,
                             BitmapSizeOptions.FromEmptyOptions());
-                        
+
                         // Freeze for cross-thread use
                         bitmapSource.Freeze();
                     }
@@ -401,19 +400,20 @@ namespace ScreenTranslation
                         // Always delete the HBitmap to prevent memory leaks
                         DeleteObject(hBitmap);
                     }
-                    
+
                     // Use BeginInvoke with high priority for UI update
-                    Dispatcher.BeginInvoke(new Action(() => {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
                         try
                         {
                             captureImage.Source = bitmapSource;
-                            
+
                             // Show window if needed
                             if (!IsVisible)
                             {
                                 Show();
                             }
-                            
+
                             // Update scrollbars
                             UpdateScrollViewerSettings();
                         }
@@ -442,7 +442,7 @@ namespace ScreenTranslation
                         IntPtr.Zero,
                         Int32Rect.Empty,
                         BitmapSizeOptions.FromEmptyOptions());
-                    
+
                     // Set the image source
                     captureImage.Source = bitmapSource;
                 }
@@ -451,13 +451,13 @@ namespace ScreenTranslation
                     // Always delete the HBitmap to prevent memory leaks
                     DeleteObject(hBitmap);
                 }
-                
+
                 // Show the window if not visible
                 if (!IsVisible)
                 {
                     Show();
                 }
-                
+
                 // Make sure scroll bars appear when needed
                 UpdateScrollViewerSettings();
             }
@@ -467,32 +467,32 @@ namespace ScreenTranslation
                 UpdateStatus($"Error: {ex.Message}");
             }
         }
-        
+
         // P/Invoke call needed for proper HBitmap cleanup
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]
         private static extern bool DeleteObject(IntPtr hObject);
-        
+
         // Update the monitor with a new screenshot from file
         public void UpdateScreenshot(string imagePath)
         {
-            if (!File.Exists(imagePath)) 
+            if (!File.Exists(imagePath))
             {
                 UpdateStatus($"File not found: {imagePath}");
                 return;
             }
-            
+
             try
             {
                 lastImagePath = imagePath;
                 Console.WriteLine($"ImagePath: {lastImagePath}");
-                
+
                 // Get the absolute file path (fully qualified)
                 string fullPath = Path.GetFullPath(imagePath);
-                
+
                 // Make a copy of the file to avoid access conflicts
-                string tempCopyPath = Path.Combine(Path.GetTempPath(), 
+                string tempCopyPath = Path.Combine(Path.GetTempPath(),
                                                  $"monitor_copy_{Guid.NewGuid()}.png");
-                
+
                 // Copy the file to a temporary location
                 try
                 {
@@ -504,12 +504,12 @@ namespace ScreenTranslation
                     // Continue with the original file if copy fails
                     tempCopyPath = fullPath;
                 }
-                
+
                 // Load the image using a FileStream to avoid URI issues
                 BitmapImage bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                
+
                 // Use a FileStream instead of UriSource
                 try
                 {
@@ -519,7 +519,7 @@ namespace ScreenTranslation
                         bitmap.EndInit();
                         bitmap.Freeze(); // Make it thread-safe and more efficient
                     }
-                    
+
                     // Ensure we're on the UI thread when updating the image source
                     if (!Dispatcher.CheckAccess())
                     {
@@ -529,7 +529,7 @@ namespace ScreenTranslation
                     {
                         captureImage.Source = bitmap;
                     }
-                    
+
                     // Clean up temp file if it's not the original
                     if (tempCopyPath != fullPath && File.Exists(tempCopyPath))
                     {
@@ -548,8 +548,8 @@ namespace ScreenTranslation
                     Console.WriteLine($"Error loading image: {ex.Message}");
                     UpdateStatus($"Error loading image: {ex.Message}");
                 }
-                
-                
+
+
                 // Clear existing overlay elements
                 // textOverlayCanvas.Children.Clear();
 
@@ -581,7 +581,7 @@ namespace ScreenTranslation
                     // Make sure scroll bars appear when needed
                     UpdateScrollViewerSettings();
                 }
-                
+
                 //UpdateStatus($"Screenshot updated: {Path.GetFileName(imagePath)}");
                 //Console.WriteLine($"Monitor window updated with screenshot: {Path.GetFileName(imagePath)}");
             }
@@ -591,7 +591,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error updating monitor: {ex.Message}");
             }
         }
-        
+
         // Ensure scroll bars appear when needed
         private void UpdateScrollViewerSettings()
         {
@@ -603,7 +603,7 @@ namespace ScreenTranslation
                     // Set the canvas size to match the image
                     textOverlayCanvas.Width = bitmapSource.PixelWidth;
                     textOverlayCanvas.Height = bitmapSource.PixelHeight;
-                    
+
                     // This ensures the scrollbars will appear when the image is larger
                     // than the available space in the ScrollViewer
                     imageContainer.Width = bitmapSource.PixelWidth;
@@ -614,7 +614,7 @@ namespace ScreenTranslation
 
         public void GetDpiScale()
         {
-            
+
             PresentationSource source = PresentationSource.FromVisual(this);
             if (source != null)
             {
@@ -622,7 +622,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"------------------------------------------- {dpiScale}");
             }
         }
-        
+
         // Handle TextObject added event
         public void CreateMonitorOverlayFromTextObject(object? sender, TextObject textObject)
         {
@@ -669,37 +669,37 @@ namespace ScreenTranslation
                 UpdateStatus($"Error adding text overlay: {ex.Message}");
             }
         }
-        
+
         // Zoom controls
         private void ZoomInButton_Click(object sender, RoutedEventArgs e)
         {
             currentZoom += zoomIncrement;
             ApplyZoom();
         }
-        
+
         private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
         {
             currentZoom = Math.Max(0.1, currentZoom - zoomIncrement);
             ApplyZoom();
         }
-        
+
         // Removed ResetZoomButton_Click as it's no longer needed with the TextBox
-        
+
         private void ApplyZoom()
         {
             // Set the transform on the container to scale both image and overlays together
             ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
             imageContainer.LayoutTransform = scaleTransform;
-            
+
             // Make sure scroll bars are correctly shown after zoom change
             UpdateScrollViewerSettings();
-            
+
             // Update zoom textbox
             zoomTextBox.Text = ((int)(currentZoom * 100)).ToString();
             UpdateStatus($"Zoom: {(int)(currentZoom * 100)}%");
             Console.WriteLine($"Zoom level changed to {(int)(currentZoom * 100)}%");
         }
-        
+
         // Method to refresh text overlays
         public void RefreshOverlays()
         {
@@ -712,33 +712,33 @@ namespace ScreenTranslation
                     Dispatcher.Invoke(() => RefreshOverlays());
                     return;
                 }
-                
+
                 // Check if canvas is initialized
                 if (textOverlayCanvas == null)
                 {
                     Console.WriteLine("Warning: textOverlayCanvas is null. Overlay refresh skipped.");
                     return;
                 }
-                
+
                 // Now we're on the UI thread, safe to update UI elements
-                
+
                 // Clear canvas
                 textOverlayCanvas.Children.Clear();
-                
+
                 // Check if Logic is initialized
                 if (Logic.Instance == null)
                 {
                     Console.WriteLine("Warning: Logic.Instance is null. Cannot refresh text objects.");
                     return;
                 }
-                
+
                 var textObjects = Logic.Instance.GetTextObjects();
                 if (textObjects == null)
                 {
                     Console.WriteLine("Warning: Text objects collection is null.");
                     return;
                 }
-                
+
                 // Re-add all current text objects
                 foreach (TextObject textObj in textObjects)
                 {
@@ -748,7 +748,7 @@ namespace ScreenTranslation
                         CreateMonitorOverlayFromTextObject(this, textObj);
                     }
                 }
-                
+
                 //UpdateStatus("Text overlays refreshed");
                 //Console.WriteLine($"Monitor window refreshed {textOverlayCanvas.Children.Count} text overlays");
             }
@@ -757,7 +757,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error refreshing overlays: {ex.Message}");
             }
         }
-        
+
         // Update status message
         private void UpdateStatus(string message)
         {
@@ -768,12 +768,12 @@ namespace ScreenTranslation
                 Dispatcher.Invoke(() => UpdateStatus(message));
                 return;
             }
-            
+
             // Now we're on the UI thread, safe to update
             if (statusText != null)
                 statusText.Text = message;
         }
-        
+
         // Initialize the translation status timer
         private void InitializeTranslationStatusTimer()
         {
@@ -781,19 +781,19 @@ namespace ScreenTranslation
             _translationStatusTimer.Interval = TimeSpan.FromSeconds(1);
             _translationStatusTimer.Tick += TranslationStatusTimer_Tick;
         }
-        
+
         // Update the translation status timer
         private void TranslationStatusTimer_Tick(object? sender, EventArgs e)
         {
             TimeSpan elapsed = DateTime.Now - _translationStartTime;
             string service = ConfigManager.Instance.GetCurrentTranslationService();
-            
+
             Dispatcher.Invoke(() =>
             {
                 translationStatusLabel.Text = $"Waiting for {service}... {elapsed.Minutes:D1}:{elapsed.Seconds:D2}";
             });
         }
-        
+
         // Show the translation status
         public void ShowTranslationStatus(bool bSettling)
         {
@@ -813,13 +813,13 @@ namespace ScreenTranslation
                     }
                 });
 
-                    return;
+                return;
             }
 
 
             _translationStartTime = DateTime.Now;
             string service = ConfigManager.Instance.GetCurrentTranslationService();
-            
+
             Dispatcher.Invoke(() =>
             {
                 translationStatusLabel.Text = $"Waiting for {service}... 0:00";
@@ -831,27 +831,27 @@ namespace ScreenTranslation
                 {
                     translationStatusBorder.Visibility = Visibility.Collapsed;
                 }
-                
+
                 // Start the timer if not already running
                 if (_translationStatusTimer == null)
                 {
                     InitializeTranslationStatusTimer();
                 }
-                
+
                 if (!_translationStatusTimer!.IsEnabled)
                 {
                     _translationStatusTimer.Start();
                 }
             });
         }
-        
+
         // Hide the translation status
         public void HideTranslationStatus()
         {
             Dispatcher.Invoke(() =>
             {
                 translationStatusBorder.Visibility = Visibility.Collapsed;
-                
+
                 // Stop the timer
                 if (_translationStatusTimer != null && _translationStatusTimer.IsEnabled)
                 {
@@ -859,7 +859,7 @@ namespace ScreenTranslation
                 }
             });
         }
-        
+
         private bool _forceClose = false;
 
         public void ForceClose()
@@ -885,9 +885,9 @@ namespace ScreenTranslation
                 Console.WriteLine("Monitor window closing operation converted to hide");
             }
         }
-        
-       
-        
+
+
+
         // Handle Enter key press in TextBoxes
         private void TextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
@@ -897,15 +897,15 @@ namespace ScreenTranslation
                 {
                     ApplyZoomFromTextBox();
                 }
-                
+
                 // Remove focus from the TextBox
                 System.Windows.Input.Keyboard.ClearFocus();
-                
+
                 // Mark the event as handled
                 e.Handled = true;
             }
         }
-        
+
         // Handle TextChanged event for zoom TextBox
         private void ZoomTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -930,13 +930,13 @@ namespace ScreenTranslation
                 zoomTextBox.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(200, 100, 100));
             }
         }
-        
+
         // Apply zoom value when focus is lost
         private void ZoomTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             ApplyZoomFromTextBox();
         }
-        
+
         // Apply zoom from TextBox value
         private void ApplyZoomFromTextBox()
         {
@@ -944,21 +944,21 @@ namespace ScreenTranslation
             {
                 // Clamp to valid range
                 value = Math.Max(10, Math.Min(1000, value));
-                
+
                 // Update value and display
                 zoomTextBox.Text = value.ToString();
                 zoomTextBox.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(64, 64, 64));
-                
+
                 // Apply zoom
                 currentZoom = value / 100.0;
-                
+
                 // Set the transform on the container to scale both image and overlays together
                 ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
                 imageContainer.LayoutTransform = scaleTransform;
-                
+
                 // Make sure scroll bars are correctly shown after zoom change
                 UpdateScrollViewerSettings();
-                
+
                 // Update status
                 UpdateStatus($"Zoom: {value}%");
                 Console.WriteLine($"Zoom level changed to {value}%");
@@ -968,17 +968,17 @@ namespace ScreenTranslation
                 // Invalid input, revert to 100%
                 zoomTextBox.Text = "100";
                 zoomTextBox.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(64, 64, 64));
-                
+
                 // Apply default zoom
                 currentZoom = 1.0;
                 ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
                 imageContainer.LayoutTransform = scaleTransform;
-                
+
                 // Update status
                 UpdateStatus("Zoom reset to default (100%)");
             }
         }
-        
-       
+
+
     }
 }

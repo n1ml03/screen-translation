@@ -35,9 +35,8 @@
             <Rectangle Width="1" Fill="#606060" Margin="10,2" VerticalAlignment="Stretch"/>
             
             <!-- Hidden controls for settings synchronization -->
-            <ComboBox x:Name="ocrMethodComboBox" Width="0" Height="0" Margin="0" Visibility="Collapsed" SelectedIndex="1">
-                <ComboBoxItem Content="EasyOCR"/>
-                <ComboBoxItem Content="Windows OCR"/>
+            <ComboBox x:Name="ocrMethodComboBox" Width="0" Height="0" Margin="0" Visibility="Collapsed" SelectedIndex="0">
+                <ComboBoxItem Content="OneOCR"/>
                 <ComboBoxItem Content="PaddleOCR"/>
             </ComboBox>
             

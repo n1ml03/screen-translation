@@ -195,15 +195,9 @@ PublishScripts/
 
 # NuGet Packages
 *.nupkg
-# NuGet Symbol Packages
 *.snupkg
-# The packages folder can be ignored because of Package Restore
 **/[Pp]ackages/*
-# except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
-# Uncomment if necessary however generally it will be regenerated when needed
-#!**/[Pp]ackages/repositories.config
-# NuGet v3's project.json files produces more ignorable files
 *.nuget.props
 *.nuget.targets
 
@@ -324,9 +318,7 @@ paket-files/
 # CodeRush personal settings
 .cr/personal
 
-# Python Tools for Visual Studio (PTVS)
-__pycache__/
-*.pyc
+# Python Tools for Visual Studio (PTVS) - moved to Python section below
 
 # Cake - Uncomment if you are using it
 # tools/**
@@ -397,23 +389,177 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
-7-Zip/
-#project specific files to ignore/not ignore
 
+# Additional IDE files
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.temp
+.cache/
+temp/
+tmp/
+
+# OS specific files
+Thumbs.db
+ehthumbs.db
+*.stackdump
+
+# Archives
+*.zip
+7-Zip/
+
+# Project specific files to ignore/not ignore
 obj/
 tempbuild/
 unused/
-#disable everything in the app directory except a few things
+
+# Disable everything in the app directory except a few things
 /app/*
 app/webserver/Miniconda3
 app/webserver/*.exe
 !app/webserver/
 !app/tessdata/
-#but keep a few things...
+# Keep a few things...
 !app/webserver/*.bat
 !app/webserver/*.py
 
-
+# Claude settings
 **/.claude/settings.local.json
 
-*.zip
+# Python
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+cython_debug/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv (Pipfile.lock commented - see pipenv docs)
+#Pipfile.lock
+
+# poetry (poetry.lock commented - see poetry docs)
+#poetry.lock
+
+# pdm (.pdm.toml commented - see pdm docs)
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.spyderproject
+.spyproject
+.ropeproject
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Additional .NET Core
+appsettings.*.json
+bundleconfig.json
+compilerconfig.json.associations.json
+*.config.user
+
+# User secrets
+secrets.json
+
+# .NET Core Tools
+.dotnet/
+
+# Additional build outputs - Bin/Obj already covered above
+out/

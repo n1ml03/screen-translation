@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -7,13 +9,43 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
-using MessageBox = System.Windows.MessageBox;
-using System.Diagnostics;
-using System.Collections.Generic;
 using FlowDirection = System.Windows.FlowDirection;
+using MessageBox = System.Windows.MessageBox;
 
 namespace ScreenTranslation
 {
+    // Enum for OCR engines
+    public enum OcrEngine
+    {
+        OneOCR,
+        PaddleOCR
+    }
+
+    // Class to track OCR engine performance metrics
+    public class OcrEngineMetrics
+    {
+        public OcrEngine Engine { get; set; }
+        public double AverageConfidence { get; set; } = 0.0;
+        public double AverageProcessingTime { get; set; } = 0.0;
+        public int SuccessCount { get; set; } = 0;
+        public int FailureCount { get; set; } = 0;
+        public bool IsAvailable { get; set; } = true;
+        public DateTime LastUsed { get; set; } = DateTime.MinValue;
+        public double ReliabilityScore => SuccessCount > 0 ? (double)SuccessCount / (SuccessCount + FailureCount) : 0.0;
+        public double PerformanceScore => CalculatePerformanceScore();
+
+        private double CalculatePerformanceScore()
+        {
+            // Performance score based on reliability and processing time
+            // Lower processing time and higher reliability = higher score
+            double timeScore = Math.Max(0, 1.0 - (AverageProcessingTime / 5000.0)); // Normalize to 5 seconds max
+            double reliabilityWeight = 0.7;
+            double timeWeight = 0.3;
+
+            return (ReliabilityScore * reliabilityWeight) + (timeScore * timeWeight);
+        }
+    }
+
     public class Logic
     {
         private static Logic? _instance;
@@ -24,26 +56,30 @@ namespace ScreenTranslation
         private int _textIDCounter = 0;
         private DateTime _lastOcrRequestTime = DateTime.MinValue;
         private readonly TimeSpan _minOcrInterval = TimeSpan.FromSeconds(0.2);
-        
+
         private DispatcherTimer _reconnectTimer;
         private string _lastOcrHash = string.Empty;
         private string _lastTextContent = string.Empty;
-        
+
+        // OCR Engine Load Balancing
+        private ConcurrentDictionary<OcrEngine, OcrEngineMetrics> _engineMetrics = new ConcurrentDictionary<OcrEngine, OcrEngineMetrics>();
+        private OcrEngine _currentPreferredEngine = OcrEngine.OneOCR; // Start with OneOCR as default
+
         // Track the current capture position
         private int _currentCaptureX;
         private int _currentCaptureY;
         private DateTime _lastChangeTime = DateTime.MinValue;
-   
+
         // Properties to expose to other classes
         public List<TextObject> TextObjects => _textObjects;
         public List<TextObject> TextObjectsOld => _textObjectsOld;
 
         // Events
         public event EventHandler<TextObject>? TextObjectAdded;
-        
+
         // Event when translation is completed
         public event EventHandler<TranslationEventArgs>? TranslationCompleted;
-     
+
         bool _waitingForTranslationToFinish = false;
 
         public bool GetWaitingForTranslationToFinish()
@@ -60,7 +96,7 @@ namespace ScreenTranslation
         }
 
         // Singleton pattern
-        public static Logic Instance 
+        public static Logic Instance
         {
             get
             {
@@ -81,14 +117,17 @@ namespace ScreenTranslation
             _textObjects = new List<TextObject>();
             _textObjectsOld = new List<TextObject>();
             _random = new Random();
-            
+
             // Initialize reconnect timer with 3-second interval
             _reconnectTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(3)
             };
             _reconnectTimer.Tick += ReconnectTimer_Tick;
-            
+
+            // Initialize OCR engine metrics
+            InitializeEngineMetrics();
+
             // Subscribe to SocketManager events
             SocketManager.Instance.DataReceived += OnSocketDataReceived;
             SocketManager.Instance.ConnectionChanged += OnSocketConnectionChanged;
@@ -99,7 +138,7 @@ namespace ScreenTranslation
         {
             _overlayContainer = overlayContainer;
         }
-        
+
         // Get the list of current text objects
         public IReadOnlyList<TextObject> GetTextObjects()
         {
@@ -110,6 +149,71 @@ namespace ScreenTranslation
             return _textObjectsOld.AsReadOnly();
         }
 
+        // Initialize OCR engine metrics
+        private void InitializeEngineMetrics()
+        {
+            foreach (OcrEngine engine in Enum.GetValues(typeof(OcrEngine)))
+            {
+                _engineMetrics[engine] = new OcrEngineMetrics
+                {
+                    Engine = engine,
+                    IsAvailable = true,
+                    AverageConfidence = 0.8, // Default confidence
+                    AverageProcessingTime = 1000.0 // Default 1 second
+                };
+            }
+        }
+
+        // Get the best available OCR engine based on performance metrics
+        public OcrEngine GetBestOcrEngine()
+        {
+            var availableEngines = _engineMetrics.Where(m => m.Value.IsAvailable).ToList();
+
+            if (!availableEngines.Any())
+            {
+                // If no engines available, default to OneOCR
+                return OcrEngine.OneOCR;
+            }
+
+            // Return engine with highest performance score
+            return availableEngines.OrderByDescending(m => m.Value.PerformanceScore).First().Key;
+        }
+
+        // Update OCR engine metrics after processing
+        public void UpdateEngineMetrics(OcrEngine engine, bool success, double confidence, double processingTimeMs)
+        {
+            if (_engineMetrics.TryGetValue(engine, out var metrics))
+            {
+                // Update rolling averages
+                double alpha = 0.1; // Smoothing factor for exponential moving average
+
+                if (success)
+                {
+                    metrics.SuccessCount++;
+                    metrics.AverageConfidence = metrics.AverageConfidence * (1 - alpha) + confidence * alpha;
+                    metrics.AverageProcessingTime = metrics.AverageProcessingTime * (1 - alpha) + processingTimeMs * alpha;
+                }
+                else
+                {
+                    metrics.FailureCount++;
+                    // Mark as unavailable if too many failures
+                    if (metrics.FailureCount > 5 && metrics.SuccessCount == 0)
+                    {
+                        metrics.IsAvailable = false;
+                    }
+                }
+
+                metrics.LastUsed = DateTime.Now;
+
+                // Update preferred engine if this one is better
+                if (engine != _currentPreferredEngine && metrics.PerformanceScore > _engineMetrics[_currentPreferredEngine].PerformanceScore)
+                {
+                    _currentPreferredEngine = engine;
+                    Console.WriteLine($"Switched to preferred OCR engine: {engine} (Score: {metrics.PerformanceScore:F3})");
+                }
+            }
+        }
+
         // Called when the application starts
         public async void Init()
         {
@@ -117,50 +221,50 @@ namespace ScreenTranslation
             {
                 // Initialize resources, settings, etc.
                 Console.WriteLine("Logic initialized");
-                
+
                 // Load LLM prompt
                 string llmPrompt = ConfigManager.Instance.GetLlmPrompt();
                 Console.WriteLine($"Loaded LLM prompt: {(string.IsNullOrEmpty(llmPrompt) ? "Not set" : $"{llmPrompt.Length} chars")}");
-                
+
                 // Load force cursor visible setting
                 // Force cursor visibility is now handled by MouseManager
-                
-                // Only connect to socket server if using EasyOCR or PaddleOCR
-                if (MainWindow.Instance.GetSelectedOcrMethod() == "EasyOCR" || MainWindow.Instance.GetSelectedOcrMethod() == "PaddleOCR")
+
+                // Only connect to socket server if using PaddleOCR or OneOCR
+                if (MainWindow.Instance.GetSelectedOcrMethod() == "PaddleOCR" || MainWindow.Instance.GetSelectedOcrMethod() == "OneOCR")
                 {
                     await ConnectToSocketServerAsync();
                 }
                 else
                 {
-                    Console.WriteLine("Using Windows OCR - socket connection not needed");
-                    
+                    Console.WriteLine("Using OneOCR - socket connection not needed");
+
                     // Update status message in the UI
-                    MainWindow.Instance.SetStatus("Using Windows OCR (built-in)");
+                    MainWindow.Instance.SetStatus("Using OneOCR (built-in)");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during initialization: {ex.Message}", "Error", 
+                MessageBox.Show($"Error during initialization: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
         // Connect to socket server
         private async Task ConnectToSocketServerAsync()
         {
             try
             {
                 Console.WriteLine("Attempting to connect to socket server...");
-                
+
                 // Check if already connected
                 if (SocketManager.Instance.IsConnected)
                 {
                     Console.WriteLine("Already connected to socket server");
                     return;
                 }
-                
+
                 await SocketManager.Instance.ConnectAsync();
-                
+
                 // Start the reconnect timer if connection failed
                 if (!SocketManager.Instance.IsConnected)
                 {
@@ -177,35 +281,35 @@ namespace ScreenTranslation
             catch (Exception ex)
             {
                 Console.WriteLine($"Socket connection error: {ex.Message}");
-                
+
                 // Start the reconnect timer
                 _reconnectAttempts = 0;
                 _hasShownConnectionErrorMessage = false;
                 _reconnectTimer.Start();
             }
         }
-        
+
         // Track reconnection attempts
         private int _reconnectAttempts = 0;
         private bool _hasShownConnectionErrorMessage = false;
-        
+
         // Reconnect timer tick event
         private async void ReconnectTimer_Tick(object? sender, EventArgs e)
         {
-            // Only try to reconnect if we're using EasyOCR or PaddleOCR
-            if (MainWindow.Instance.GetSelectedOcrMethod() != "EasyOCR" || MainWindow.Instance.GetSelectedOcrMethod() != "PaddleOCR")
+            // Only try to reconnect if we're using PaddleOCR (OneOCR doesn't need a server)
+            if (MainWindow.Instance.GetSelectedOcrMethod() != "PaddleOCR")
             {
                 _reconnectTimer.Stop();
                 _reconnectAttempts = 0;
                 _hasShownConnectionErrorMessage = false;
                 return;
             }
-            
+
             if (!SocketManager.Instance.IsConnected)
             {
                 _reconnectAttempts++;
                 await SocketManager.Instance.TryReconnectAsync();
-                
+
                 // Stop the timer if connected
                 if (SocketManager.Instance.IsConnected)
                 {
@@ -218,15 +322,15 @@ namespace ScreenTranslation
                 {
                     _hasShownConnectionErrorMessage = true;
                     string serverUrl = $"localhost:{SocketManager.Instance.GetPort()}";
-                    
+
                     string message = $"Connection Error: AI server not running at {serverUrl}\n\n" +
                                      "Have you been click SetupServer button yet (only need to do this once during initial setup)?\n\n" +
                                      "If you have not been run, please click the SetupServer button, wait for finish and try again.\n\n" +
                                      "Some fix you can try:\n\n" +
                                      "1. Click StopServer button to stop server then Click StartServer button to start server\n" +
                                      "2. Close and reopen application";
-                    
-                    MessageBox.Show(message,"Server Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    MessageBox.Show(message, "Server Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
@@ -237,7 +341,7 @@ namespace ScreenTranslation
                 _hasShownConnectionErrorMessage = false;
             }
         }
-        
+
         // Socket data received event handler
         private void OnSocketDataReceived(object? sender, string data)
         {
@@ -246,12 +350,12 @@ namespace ScreenTranslation
             // Process the received data
             ProcessReceivedTextJsonData(data);
         }
-        
+
         // Socket connection changed event handler
         private void OnSocketConnectionChanged(object? sender, bool isConnected)
         {
-            // If not connected and we're using EasyOCR or PaddleOCR, start the reconnect timer
-            if (!isConnected && (MainWindow.Instance.GetSelectedOcrMethod() == "EasyOCR" || !isConnected && MainWindow.Instance.GetSelectedOcrMethod() == "PaddleOCR"))
+            // If not connected and we're using PaddleOCR or OneOCR, start the reconnect timer
+            if (!isConnected && (MainWindow.Instance.GetSelectedOcrMethod() == "PaddleOCR" || !isConnected && MainWindow.Instance.GetSelectedOcrMethod() == "OneOCR"))
             {
                 Console.WriteLine("Connection status changed to disconnected. Starting reconnect timer.");
                 SocketManager.Instance._isConnected = false;
@@ -266,7 +370,7 @@ namespace ScreenTranslation
                 _hasShownConnectionErrorMessage = false;
             }
         }
-        
+
         void OnFinishedThings(bool bResetTranslationStatus)
         {
             SetWaitingForTranslationToFinish(false);
@@ -277,6 +381,9 @@ namespace ScreenTranslation
             {
                 MonitorWindow.Instance.HideTranslationStatus();
             }
+
+            // Re-enable OCR check for next frame
+            MainWindow.Instance.SetOCRCheckIsWanted(true);
         }
 
         public void ResetHash()
@@ -284,7 +391,7 @@ namespace ScreenTranslation
             _lastOcrHash = "";
             _lastChangeTime = DateTime.Now;
         }
-        
+
 
         // Process received text JSON data for google translate
 
@@ -292,9 +399,9 @@ namespace ScreenTranslation
         {
             if (resultsElement.ValueKind != JsonValueKind.Array)
                 return string.Empty;
-                
+
             StringBuilder textBuilder = new StringBuilder();
-            
+
             foreach (JsonElement element in resultsElement.EnumerateArray())
             {
                 if (element.TryGetProperty("text", out JsonElement textElement))
@@ -307,19 +414,205 @@ namespace ScreenTranslation
                     }
                 }
             }
-            
+
             return textBuilder.ToString().Trim();
+        }
+
+        // Handle successful OCR response processing
+        private void HandleJsonSuccessResponse(JsonElement root, JsonElement resultsElement)
+        {
+            // Pre-filter low-confidence characters before block detection
+            JsonElement filteredResults = FilterLowConfidenceCharacters(resultsElement);
+
+            // Process character-level OCR data using CharacterBlockDetectionManager
+            JsonElement modifiedResults = CharacterBlockDetectionManager.Instance.ProcessCharacterResults(filteredResults);
+
+            // Filter out text objects that should be ignored based on ignore phrases
+            modifiedResults = FilterIgnoredPhrases(modifiedResults);
+
+            // Generate content hash AFTER block detection and filtering
+            string contentHash = GenerateContentHash(modifiedResults);
+            string textContent = ExtractTextContent(modifiedResults);
+
+            // Handle settle time logic
+            if (HandleSettleTimeLogic(contentHash, textContent))
+            {
+                return; // Early return if content is being settled
+            }
+
+            // Process OCR results for display
+            ProcessOcrResultsForDisplay(root, modifiedResults, resultsElement);
+
+            // Handle translation or chatbox addition
+            HandleTranslationOrChatbox();
+        }
+
+        // Handle settle time logic
+        private bool HandleSettleTimeLogic(string contentHash, string textContent)
+        {
+            double settleTime = ConfigManager.Instance.GetBlockDetectionSettleTime();
+            if (settleTime > 0)
+            {
+                if (contentHash == _lastOcrHash || IsTextSimilar(textContent, _lastTextContent, Convert.ToDouble(ConfigManager.Instance.GetTextSimilarThreshold())))
+                {
+                    if (_lastChangeTime == DateTime.MinValue)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Content is similar to previous, skipping translation");
+                        OnFinishedThings(true);
+                        return true; // Already rendered it, just ignore until it changes again
+                    }
+                    else
+                    {
+                        // Check if we are within the settling time
+                        if ((DateTime.Now - _lastChangeTime).TotalSeconds < settleTime)
+                        {
+                            OnFinishedThings(false);
+                            return true;
+                        }
+                        else
+                        {
+                            // Settle time reached
+                            _lastChangeTime = DateTime.MinValue;
+                        }
+                    }
+                }
+                else
+                {
+                    _lastChangeTime = DateTime.Now;
+                    _lastOcrHash = contentHash;
+                    _lastTextContent = textContent;
+
+                    //only run if translation is still active
+                    if (MainWindow.Instance.GetIsStarted())
+                    {
+                        MonitorWindow.Instance.ShowTranslationStatus(true);
+                        ChatBoxWindow.Instance?.ShowTranslationStatus(true);
+                    }
+
+                    OnFinishedThings(false);
+                    return true; // Sure, it's new, but we probably aren't ready to show it yet
+                }
+            }
+            else if (IsTextSimilar(textContent, _lastTextContent, Convert.ToDouble(ConfigManager.Instance.GetTextSimilarThreshold())))
+            {
+                System.Diagnostics.Debug.WriteLine("Content is similar to previous, skipping translation");
+                OnFinishedThings(true);
+                return true;
+            }
+
+            // Looks like new stuff
+            _lastOcrHash = contentHash;
+            _lastTextContent = textContent;
+            return false;
+        }
+
+        // Process OCR results for display
+        private void ProcessOcrResultsForDisplay(JsonElement root, JsonElement modifiedResults, JsonElement originalResultsElement)
+        {
+            double scale = BlockDetectionManager.Instance.GetBlockDetectionScale();
+            System.Diagnostics.Debug.WriteLine($"Character-level processing (scale={scale:F2}): {originalResultsElement.GetArrayLength()} characters → {modifiedResults.GetArrayLength()} blocks");
+
+            // Create a new JsonDocument with the modified results
+            using (var stream = new MemoryStream())
+            {
+                using (var writer = new Utf8JsonWriter(stream))
+                {
+                    writer.WriteStartObject();
+
+                    // Copy over all existing properties except 'results'
+                    foreach (var property in root.EnumerateObject())
+                    {
+                        if (property.Name != "results")
+                        {
+                            property.WriteTo(writer);
+                        }
+                    }
+
+                    // Add our modified results
+                    writer.WritePropertyName("results");
+                    modifiedResults.WriteTo(writer);
+
+                    // Add marker to indicate this is character-level data
+                    writer.WriteBoolean("char_level", true);
+
+                    writer.WriteEndObject();
+                }
+
+                stream.Position = 0;
+                using (JsonDocument newDoc = JsonDocument.Parse(stream))
+                {
+                    DisplayOcrResults(newDoc.RootElement);
+                }
+
+                _ocrProcessingStopwatch.Stop();
+                System.Diagnostics.Debug.WriteLine($"OCR JSON processing took {_ocrProcessingStopwatch.ElapsedMilliseconds} ms");
+            }
+        }
+
+        // Handle translation or chatbox addition
+        private void HandleTranslationOrChatbox()
+        {
+            if (_textObjects.Count > 0)
+            {
+                // Build a string with all the detected text
+                StringBuilder detectedText = new StringBuilder();
+                foreach (var textObject in _textObjects)
+                {
+                    if (textObject != null && !string.IsNullOrEmpty(textObject.Text))
+                    {
+                        detectedText.AppendLine(textObject.Text);
+                    }
+                }
+
+                // Add to ChatBox with empty translation if translate is disabled
+                string combinedText = detectedText.ToString().Trim();
+                if (!string.IsNullOrEmpty(combinedText))
+                {
+                    if (MainWindow.Instance.GetTranslateEnabled())
+                    {
+                        // If translation is enabled, translate the text
+                        if (!GetWaitingForTranslationToFinish())
+                        {
+                            // Translate the text objects
+                            _lastChangeTime = DateTime.MinValue;
+                            _ = TranslateTextObjectsAsync();
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Only add to chat history if translation is disabled
+                        _lastChangeTime = DateTime.MinValue;
+                        MainWindow.Instance.AddTranslationToHistory(combinedText, "");
+
+                        if (ChatBoxWindow.Instance != null)
+                        {
+                            ChatBoxWindow.Instance.OnTranslationWasAdded(combinedText, "");
+                        }
+                    }
+                }
+
+                OnFinishedThings(true);
+            }
+            else
+            {
+                OnFinishedThings(true);
+            }
         }
 
         //! Process the OCR text data, this is before it's been translated
         public void ProcessReceivedTextJsonData(string data)
         {
+            if (string.IsNullOrEmpty(data))
+            {
+                return;
+            }
+
             _ocrProcessingStopwatch.Restart();
             MainWindow.Instance.SetOCRCheckIsWanted(true);
 
             if (GetWaitingForTranslationToFinish())
             {
-                Console.WriteLine("Skipping OCR results - waiting for translation to finish");
                 return;
             }
 
@@ -348,170 +641,23 @@ namespace ScreenTranslation
 
                             if (status == "success" && root.TryGetProperty("results", out JsonElement resultsElement))
                             {
-                                // Pre-filter low-confidence characters before block detection
-                                JsonElement filteredResults = FilterLowConfidenceCharacters(resultsElement);
-
-                                // Process character-level OCR data using CharacterBlockDetectionManager
-                                // Use the filtered results for consistency
-                                JsonElement modifiedResults = CharacterBlockDetectionManager.Instance.ProcessCharacterResults(filteredResults);
-
-                                // Filter out text objects that should be ignored based on ignore phrases
-                                modifiedResults = FilterIgnoredPhrases(modifiedResults);
-
-                                // Generate content hash AFTER block detection and filtering
-                                string contentHash = GenerateContentHash(modifiedResults);
-                                string textContent = ExtractTextContent(modifiedResults);
-
-                                // Handle settle time if enabled
-                                double settleTime = ConfigManager.Instance.GetBlockDetectionSettleTime();
-                                if (settleTime > 0)
-                                {
-                                    if (contentHash == _lastOcrHash || IsTextSimilar(textContent, _lastTextContent, Convert.ToDouble(ConfigManager.Instance.GetTextSimilarThreshold())))
-                                    {
-                                        if (_lastChangeTime == DateTime.MinValue)
-                                        {
-                                            Console.WriteLine("Content is similar to previous, skipping translation");
-                                            OnFinishedThings(true);
-                                            return; // Already rendered it, just ignore until it changes again
-                                        }
-                                        else
-                                        {
-                                            // Check if we are within the settling time
-                                            if ((DateTime.Now - _lastChangeTime).TotalSeconds < settleTime)
-                                            {
-                                                OnFinishedThings(false);
-                                                return;
-                                            }
-                                            else
-                                            {
-                                                // Settle time reached
-                                                _lastChangeTime = DateTime.MinValue;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        _lastChangeTime = DateTime.Now;
-                                        _lastOcrHash = contentHash;
-                                        _lastTextContent = textContent;
-
-                                        //only run if translation is still active
-                                        if (MainWindow.Instance.GetIsStarted())
-                                        {
-
-                                            MonitorWindow.Instance.ShowTranslationStatus(true);
-                                            ChatBoxWindow.Instance?.ShowTranslationStatus(true);
-                                        }
-
-                                        OnFinishedThings(false);
-                                        return; // Sure, it's new, but we probably aren't ready to show it yet
-                                    }
-                                } else if (IsTextSimilar(textContent, _lastTextContent, Convert.ToDouble(ConfigManager.Instance.GetTextSimilarThreshold())))
-                                {
-                                    Console.WriteLine("Content is similar to previous, skipping translation");
-                                    OnFinishedThings(true);
-                                    return;
-                                }
-                                // Looks like new stuff
-                                _lastOcrHash = contentHash;
-                                _lastTextContent = textContent;
-                                double scale = BlockDetectionManager.Instance.GetBlockDetectionScale();
-                                Console.WriteLine($"Character-level processing (scale={scale:F2}): {resultsElement.GetArrayLength()} characters → {modifiedResults.GetArrayLength()} blocks");
-
-                                // Create a new JsonDocument with the modified results
-                                using (var stream = new MemoryStream())
-                                {
-                                    using (var writer = new Utf8JsonWriter(stream))
-                                    {
-                                        writer.WriteStartObject();
-
-                                        // Copy over all existing properties except 'results'
-                                        foreach (var property in root.EnumerateObject())
-                                        {
-                                            if (property.Name != "results")
-                                            {
-                                                property.WriteTo(writer);
-                                            }
-                                        }
-
-                                        // Add our modified results
-                                        writer.WritePropertyName("results");
-                                        modifiedResults.WriteTo(writer);
-
-                                        // Add marker to indicate this is character-level data
-                                        writer.WriteBoolean("char_level", true);
-
-                                        writer.WriteEndObject();
-                                    }
-
-                                    stream.Position = 0;
-                                    using (JsonDocument newDoc = JsonDocument.Parse(stream))
-                                    {
-                                        DisplayOcrResults(newDoc.RootElement);
-                                    }
-
-                                    _ocrProcessingStopwatch.Stop();
-                                    Console.WriteLine($"OCR JSON processing took {_ocrProcessingStopwatch.ElapsedMilliseconds} ms");
-
-                                }
-
-                                // Add the detected text to the ChatBox
-                                if (_textObjects.Count > 0)
-                                {
-                                    // Build a string with all the detected text
-                                    StringBuilder detectedText = new StringBuilder();
-                                    foreach (var textObject in _textObjects)
-                                    {
-                                        detectedText.AppendLine(textObject.Text);
-                                    }
-
-                                    // Add to ChatBox with empty translation if translate is disabled
-                                    string combinedText = detectedText.ToString().Trim();
-                                    if (!string.IsNullOrEmpty(combinedText))
-                                    {
-                                        if (MainWindow.Instance.GetTranslateEnabled())
-                                        {
-                                            // If translation is enabled, translate the text
-                                            if (!GetWaitingForTranslationToFinish())
-                                            {
-                                                //Console.WriteLine($"Translating text: {combinedText}");
-                                                // Translate the text objects
-                                                _lastChangeTime = DateTime.MinValue;
-                                                _ = TranslateTextObjectsAsync();
-                                                return;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            // Only add to chat history if translation is disabled
-                                            _lastChangeTime = DateTime.MinValue;
-                                            MainWindow.Instance.AddTranslationToHistory(combinedText, "");
-
-                                            if (ChatBoxWindow.Instance != null)
-                                            {
-                                                ChatBoxWindow.Instance.OnTranslationWasAdded(combinedText, "");
-                                            }
-                                        }
-                                    }
-
-                                    OnFinishedThings(true);
-                                }
-                                else
-                                {
-                                    OnFinishedThings(true);
-                                }
+                                // Track OCR engine performance
+                                TrackOcrEnginePerformance(true, resultsElement);
+                                HandleJsonSuccessResponse(root, resultsElement);
                             }
                             else if (status == "error" && root.TryGetProperty("message", out JsonElement messageElement))
                             {
+                                // Track OCR engine failure
+                                TrackOcrEnginePerformance(false, null);
                                 // Display error message
                                 string errorMsg = messageElement.GetString() ?? "Unknown error";
-                                Console.WriteLine(errorMsg);
+                                System.Diagnostics.Debug.WriteLine($"OCR Error: {errorMsg}");
                             }
                         }
                     }
                     catch (JsonException ex)
                     {
-                        Console.WriteLine($"JSON parsing error: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"JSON parsing error: {ex.Message}");
                         AddTextObject($"JSON Error: {ex.Message}");
                     }
                 }
@@ -523,11 +669,10 @@ namespace ScreenTranslation
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing socket data: {ex.Message}");
+                Console.WriteLine($"[SOCKET ERROR] {ex.Message}");
             }
-
         }
-        
+
         /// <summary>
         /// Determines if two text strings are similar based on multiple similarity metrics
         /// </summary>
@@ -541,28 +686,28 @@ namespace ScreenTranslation
             if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2)) return true;
             if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2)) return false;
             if (s1 == s2) return true;
-            
+
             // For very short strings, use exact matching with trimming
             if (s1.Length < 5 || s2.Length < 5)
             {
                 return s1.Trim().Equals(s2.Trim(), StringComparison.OrdinalIgnoreCase);
             }
-            
+
             // Calculate similarity using different metrics
             double keywordSim = KeywordSimilarity(s1, s2);
             double diceSim = DiceCoefficient(s1, s2);
             double wordOverlapSim = WordOverlapSimilarity(s1, s2);
-            
+
             // Use the maximum similarity score from all methods
             double maxSimilarity = Math.Max(Math.Max(keywordSim, diceSim), wordOverlapSim);
-            
+
             // Debug similarity scores if needed
             // Console.WriteLine($"Similarity between '{s1}' and '{s2}': Keyword={keywordSim:F2}, Dice={diceSim:F2}, WordOverlap={wordOverlapSim:F2}, Max={maxSimilarity:F2}");
-            
+
             // Return true if any similarity metric exceeds the threshold
             return maxSimilarity >= threshold;
         }
-        
+
         /// <summary>
         /// Method to calculate the similarity between two strings using the Dice coefficient
         /// </summary>
@@ -572,7 +717,7 @@ namespace ScreenTranslation
             int commonChars = 0;
             HashSet<char> chars1 = new HashSet<char>(s1);
             HashSet<char> chars2 = new HashSet<char>(s2);
-            
+
             foreach (char c in chars1)
             {
                 if (chars2.Contains(c))
@@ -580,24 +725,24 @@ namespace ScreenTranslation
                     commonChars++;
                 }
             }
-            
-            double characterSimilarity = chars1.Count > 0 && chars2.Count > 0 
+
+            double characterSimilarity = chars1.Count > 0 && chars2.Count > 0
                 ? (double)commonChars / Math.Max(chars1.Count, chars2.Count)
                 : 0;
-            
+
             double ngramSimilarity = CalculateNgramSimilarity(s1, s2, 3);
-            
+
             // Compare the strings base on length ratio
             double lengthRatio = Math.Min(s1.Length, s2.Length) / (double)Math.Max(s1.Length, s2.Length);
-            
+
             // Combine the similarity scores
             double charWeight = 0.4;
             double ngramWeight = 0.5;
             double lengthWeight = 0.1;
-            
+
             // Calculate the combined similarity score
-            return (characterSimilarity * charWeight) + 
-                (ngramSimilarity * ngramWeight) + 
+            return (characterSimilarity * charWeight) +
+                (ngramSimilarity * ngramWeight) +
                 (lengthRatio * lengthWeight);
         }
 
@@ -610,23 +755,23 @@ namespace ScreenTranslation
                 n = Math.Min(s1.Length, s2.Length);
                 if (n == 0) return 0;
             }
-            
+
             // Create a HashSet to store the n-grams of each string
             var ngrams1 = new HashSet<string>();
             var ngrams2 = new HashSet<string>();
-            
+
             // Create n-grams for the first string
             for (int i = 0; i <= s1.Length - n; i++)
             {
                 ngrams1.Add(s1.Substring(i, n));
             }
-            
+
             // Create n-grams for the second string
             for (int i = 0; i <= s2.Length - n; i++)
             {
                 ngrams2.Add(s2.Substring(i, n));
             }
-            
+
             // Count the number of common n-grams
             int intersectionCount = 0;
             foreach (var ngram in ngrams1)
@@ -636,7 +781,7 @@ namespace ScreenTranslation
                     intersectionCount++;
                 }
             }
-            
+
             // Calculate the Dice coefficient
             return ngrams1.Count > 0 && ngrams2.Count > 0
                 ? (2.0 * intersectionCount) / (ngrams1.Count + ngrams2.Count)
@@ -652,34 +797,34 @@ namespace ScreenTranslation
             if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2)) return 1.0;
             if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2)) return 0.0;
             if (s1 == s2) return 1.0;
-            
+
             // Get stop words for the current language
             HashSet<string> stopWords = GetStopWordsForCurrentLanguage();
-            
+
             // Separate the strings into words and filter out stop words in one pass
             var keywords1 = new HashSet<string>(
-                s1.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' }, 
+                s1.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' },
                     StringSplitOptions.RemoveEmptyEntries)
                     .Select(w => w.ToLowerInvariant())
                     .Where(w => !stopWords.Contains(w))
             );
-            
+
             var keywords2 = new HashSet<string>(
-                s2.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' }, 
+                s2.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' },
                     StringSplitOptions.RemoveEmptyEntries)
                     .Select(w => w.ToLowerInvariant())
                     .Where(w => !stopWords.Contains(w))
             );
-            
+
             // If either set is empty, use Dice coefficient on the original strings
             if (keywords1.Count == 0 || keywords2.Count == 0)
             {
                 return DiceCoefficient(s1, s2);
             }
-            
+
             // Calculate intersection size efficiently using LINQ
             int commonKeywords = keywords1.Count(keyword => keywords2.Contains(keyword));
-            
+
             // Calculate the Dice coefficient: 2*|X∩Y|/(|X|+|Y|)
             return (2.0 * commonKeywords) / (keywords1.Count + keywords2.Count);
         }
@@ -691,63 +836,63 @@ namespace ScreenTranslation
         {
             // Get the current language code
             string language = GetSourceLanguage().ToLowerInvariant();
-            
+
             // Return appropriate stop words based on language
             return language switch
             {
-                "ja" => new HashSet<string> { 
-                    "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる", 
-                    "も", "する", "から", "な", "こと", "として", "い", "や", "れる", "など", "なっ", "ない", 
-                    "この", "ため", "その", "あっ", "よう", "また", "もの", "という", "あり", "まで", "られ", 
-                    "なる", "へ", "か", "だ", "これ", "によって", "により", "おり", "より", "による", "ず", 
-                    "なり", "られる", "において", "ば", "なかっ", "なく", "しかし", "について", "せ", "だっ", 
-                    "その後", "できる", "それ", "う", "ので", "なお", "のみ", "でき", "き", "つ", "における", 
-                    "および", "いう", "さらに", "でも", "ら", "たり", "その他", "に関する", "たち", "ます", 
-                    "ん", "なら", "に対して", "特に", "せる", "及び", "これら", "とき", "では", "にて", "ほか", 
-                    "ながら", "うち", "そして", "とともに", "ただし", "かつて", "それぞれ", "または", "お", 
-                    "ほど", "ものの", "に対する", "ほとんど", "と共に", "といった", "です", "とも", "ところ", "ここ" 
+                "ja" => new HashSet<string> {
+                    "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる",
+                    "も", "する", "から", "な", "こと", "として", "い", "や", "れる", "など", "なっ", "ない",
+                    "この", "ため", "その", "あっ", "よう", "また", "もの", "という", "あり", "まで", "られ",
+                    "なる", "へ", "か", "だ", "これ", "によって", "により", "おり", "より", "による", "ず",
+                    "なり", "られる", "において", "ば", "なかっ", "なく", "しかし", "について", "せ", "だっ",
+                    "その後", "できる", "それ", "う", "ので", "なお", "のみ", "でき", "き", "つ", "における",
+                    "および", "いう", "さらに", "でも", "ら", "たり", "その他", "に関する", "たち", "ます",
+                    "ん", "なら", "に対して", "特に", "せる", "及び", "これら", "とき", "では", "にて", "ほか",
+                    "ながら", "うち", "そして", "とともに", "ただし", "かつて", "それぞれ", "または", "お",
+                    "ほど", "ものの", "に対する", "ほとんど", "と共に", "といった", "です", "とも", "ところ", "ここ"
                 },
-                "ch_sim" => new HashSet<string> { 
-                    "的", "了", "和", "是", "就", "都", "而", "及", "與", "著", "或", "一個", "沒有", 
-                    "我們", "你們", "他們", "她們", "自己", "其中", "之後", "什麼", "一些", "這個", "那個", 
-                    "這些", "那些", "每個", "各自", "的話", "一樣", "不同", "因此", "因為", "所以", "如果", 
-                    "但是", "不過", "只是", "除了", "以及", "然後", "現在", "曾經", "已經", "一直", "將來", 
-                    "一定", "可能", "應該", "需要", "不能", "可以", "不要", "不會", "那麼", "如何", "為何", 
-                    "怎樣", "哪裡", "誰", "什麼", "為什麼", "多少", "幾時", "如何", "怎樣", "哪裡", "從哪裡", "到哪裡" 
+                "ch_sim" => new HashSet<string> {
+                    "的", "了", "和", "是", "就", "都", "而", "及", "與", "著", "或", "一個", "沒有",
+                    "我們", "你們", "他們", "她們", "自己", "其中", "之後", "什麼", "一些", "這個", "那個",
+                    "這些", "那些", "每個", "各自", "的話", "一樣", "不同", "因此", "因為", "所以", "如果",
+                    "但是", "不過", "只是", "除了", "以及", "然後", "現在", "曾經", "已經", "一直", "將來",
+                    "一定", "可能", "應該", "需要", "不能", "可以", "不要", "不會", "那麼", "如何", "為何",
+                    "怎樣", "哪裡", "誰", "什麼", "為什麼", "多少", "幾時", "如何", "怎樣", "哪裡", "從哪裡", "到哪裡"
                 },
-                "ko" => new HashSet<string> { 
-                    "이", "그", "저", "것", "수", "등", "들", "및", "에서", "그리고", "그러나", "그런데", 
-                    "그래서", "또는", "혹은", "그러므로", "따라서", "하지만", "또한", "에게", "의해", "때문에", 
-                    "을", "를", "이", "가", "에", "에게", "께", "한테", "더러", "에서", "에게서", "한테서", 
-                    "로", "으로", "와", "과", "랑", "이랑", "하고", "처럼", "만큼", "보다", "같이", "도", 
-                    "만", "부터", "까지", "마저", "조차", "커녕", "은", "는", "이", "가", "을", "를", 
-                    "의", "로서", "로써", "서", "에서", "께서" 
+                "ko" => new HashSet<string> {
+                    "이", "그", "저", "것", "수", "등", "들", "및", "에서", "그리고", "그러나", "그런데",
+                    "그래서", "또는", "혹은", "그러므로", "따라서", "하지만", "또한", "에게", "의해", "때문에",
+                    "을", "를", "이", "가", "에", "에게", "께", "한테", "더러", "에서", "에게서", "한테서",
+                    "로", "으로", "와", "과", "랑", "이랑", "하고", "처럼", "만큼", "보다", "같이", "도",
+                    "만", "부터", "까지", "마저", "조차", "커녕", "은", "는", "이", "가", "을", "를",
+                    "의", "로서", "로써", "서", "에서", "께서"
                 },
-                "vi" => new HashSet<string> { 
-                    "và", "của", "cho", "trong", "là", "với", "có", "được", "tại", "những", "để", 
-                    "các", "đến", "về", "không", "này", "như", "từ", "một", "người", "ra", "thì", 
-                    "bị", "đã", "sẽ", "đang", "nên", "cần", "vì", "khi", "nếu", "cũng", "nhưng", 
-                    "mà", "còn", "phải", "trên", "dưới", "theo", "do", "vào", "lúc", "sau", "rồi", 
-                    "đó", "nào", "thế", "vậy", "tôi", "bạn", "anh", "chị", "ông", "bà", "họ", 
-                    "chúng", "ta", "mình", "làm", "biết", "đi", "thấy", "muốn", "nói", "nhìn", 
-                    "thích", "cảm", "yêu", "ghét", "sợ", "buồn", "vui", "giận", "mệt", "đói", 
-                    "khát", "ngủ", "dậy", "chạy", "đứng", "ngồi", "nằm" 
+                "vi" => new HashSet<string> {
+                    "và", "của", "cho", "trong", "là", "với", "có", "được", "tại", "những", "để",
+                    "các", "đến", "về", "không", "này", "như", "từ", "một", "người", "ra", "thì",
+                    "bị", "đã", "sẽ", "đang", "nên", "cần", "vì", "khi", "nếu", "cũng", "nhưng",
+                    "mà", "còn", "phải", "trên", "dưới", "theo", "do", "vào", "lúc", "sau", "rồi",
+                    "đó", "nào", "thế", "vậy", "tôi", "bạn", "anh", "chị", "ông", "bà", "họ",
+                    "chúng", "ta", "mình", "làm", "biết", "đi", "thấy", "muốn", "nói", "nhìn",
+                    "thích", "cảm", "yêu", "ghét", "sợ", "buồn", "vui", "giận", "mệt", "đói",
+                    "khát", "ngủ", "dậy", "chạy", "đứng", "ngồi", "nằm"
                 },
-                _ => new HashSet<string> { 
-                    "a", "an", "the", "and", "or", "but", "is", "are", "was", "were", "be", 
-                    "been", "being", "in", "on", "at", "to", "for", "with", "by", "about", 
-                    "against", "between", "into", "through", "during", "before", "after", 
-                    "above", "below", "from", "up", "down", "of", "off", "over", "under", 
-                    "again", "further", "then", "once", "here", "there", "when", "where", 
-                    "why", "how", "all", "any", "both", "each", "few", "more", "most", 
-                    "other", "some", "such", "no", "nor", "not", "only", "own", "same", 
-                    "so", "than", "too", "very", "can", "will", "just", "should", "now", 
-                    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", 
-                    "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", 
-                    "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", 
-                    "their", "theirs", "themselves", "what", "which", "who", "whom", "this", 
-                    "that", "these", "those", "am", "have", "has", "had", "do", "does", 
-                    "did", "doing", "would", "could", "should", "ought" 
+                _ => new HashSet<string> {
+                    "a", "an", "the", "and", "or", "but", "is", "are", "was", "were", "be",
+                    "been", "being", "in", "on", "at", "to", "for", "with", "by", "about",
+                    "against", "between", "into", "through", "during", "before", "after",
+                    "above", "below", "from", "up", "down", "of", "off", "over", "under",
+                    "again", "further", "then", "once", "here", "there", "when", "where",
+                    "why", "how", "all", "any", "both", "each", "few", "more", "most",
+                    "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+                    "so", "than", "too", "very", "can", "will", "just", "should", "now",
+                    "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you",
+                    "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself",
+                    "she", "her", "hers", "herself", "it", "its", "itself", "they", "them",
+                    "their", "theirs", "themselves", "what", "which", "who", "whom", "this",
+                    "that", "these", "those", "am", "have", "has", "had", "do", "does",
+                    "did", "doing", "would", "could", "should", "ought"
                 }
             };
         }
@@ -761,7 +906,7 @@ namespace ScreenTranslation
             if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2)) return 1.0;
             if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2)) return 0.0;
             if (s1 == s2) return 1.0;
-            
+
             // if string is too short to create bigrams, compare directly
             if (s1.Length < 2 || s2.Length < 2)
             {
@@ -812,20 +957,20 @@ namespace ScreenTranslation
             if (string.IsNullOrEmpty(s1) && string.IsNullOrEmpty(s2)) return 1.0;
             if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2)) return 0.0;
             if (s1 == s2) return 1.0;
-            
+
             // Separate the strings into words
-            string[] words1 = s1.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' }, 
+            string[] words1 = s1.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' },
                 StringSplitOptions.RemoveEmptyEntries);
-            string[] words2 = s2.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' }, 
+            string[] words2 = s2.Split(new char[] { ' ', ',', '.', '!', '?', ';', ':', '-', '\n', '\r', '\t' },
                 StringSplitOptions.RemoveEmptyEntries);
-            
+
 
             if (words1.Length == 0 || words2.Length == 0) return 0.0;
-            
+
             // Transform words to lowercase and create sets of unique words
             var wordSet1 = new HashSet<string>(words1.Select(w => w.ToLowerInvariant()));
             var wordSet2 = new HashSet<string>(words2.Select(w => w.ToLowerInvariant()));
-            
+
             // Count the number of common words
             int commonWords = 0;
             foreach (var word in wordSet1)
@@ -835,7 +980,7 @@ namespace ScreenTranslation
                     commonWords++;
                 }
             }
-            
+
             // Calculate the Jaccard index
             return (double)commonWords / (wordSet1.Count + wordSet2.Count - commonWords);
         }
@@ -845,7 +990,7 @@ namespace ScreenTranslation
         {
             if (resultsElement.ValueKind != JsonValueKind.Array)
                 return resultsElement;
-                
+
             try
             {
                 // Create a new JSON array for filtered results
@@ -854,12 +999,12 @@ namespace ScreenTranslation
                     using (var writer = new Utf8JsonWriter(ms))
                     {
                         writer.WriteStartArray();
-                        
+
                         // Process each element in the array
                         for (int i = 0; i < resultsElement.GetArrayLength(); i++)
                         {
                             var item = resultsElement[i];
-                            
+
                             // Skip items that don't have the text property
                             if (!item.TryGetProperty("text", out var textElement))
                             {
@@ -867,25 +1012,25 @@ namespace ScreenTranslation
                                 item.WriteTo(writer);
                                 continue;
                             }
-                            
+
                             // Get the text from the element
                             string text = textElement.GetString() ?? "";
-                            
+
                             // Check if we should ignore this text
                             var (shouldIgnore, filteredText) = ShouldIgnoreText(text);
-                            
+
                             if (shouldIgnore)
                             {
                                 // Skip this element entirely
                                 continue;
                             }
-                            
+
                             // If the text was filtered but not ignored completely
                             if (filteredText != text)
                             {
                                 // We need to create a new JSON object with the filtered text
                                 writer.WriteStartObject();
-                                
+
                                 // Copy all properties except 'text'
                                 foreach (var property in item.EnumerateObject())
                                 {
@@ -894,11 +1039,11 @@ namespace ScreenTranslation
                                         property.WriteTo(writer);
                                     }
                                 }
-                                
+
                                 // Write the filtered text
                                 writer.WritePropertyName("text");
                                 writer.WriteStringValue(filteredText);
-                                
+
                                 writer.WriteEndObject();
                             }
                             else
@@ -907,10 +1052,10 @@ namespace ScreenTranslation
                                 item.WriteTo(writer);
                             }
                         }
-                        
+
                         writer.WriteEndArray();
                         writer.Flush();
-                        
+
                         // Read the filtered JSON back
                         ms.Position = 0;
                         using (JsonDocument doc = JsonDocument.Parse(ms))
@@ -926,28 +1071,28 @@ namespace ScreenTranslation
                 return resultsElement; // Return original on error
             }
         }
-        
+
         // Check if a text should be ignored based on ignore phrases
         private (bool ShouldIgnore, string FilteredText) ShouldIgnoreText(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
                 return (true, string.Empty);
-                
+
             // Get all ignore phrases from ConfigManager
             var ignorePhrases = ConfigManager.Instance.GetIgnorePhrases();
-            
+
             if (ignorePhrases.Count == 0)
                 return (false, text); // No phrases to check, keep the text as is
-                
+
             string filteredText = text;
-            
+
             //Console.WriteLine($"Checking text '{text}' against {ignorePhrases.Count} ignore phrases");
-            
+
             foreach (var (phrase, exactMatch) in ignorePhrases)
             {
                 if (string.IsNullOrEmpty(phrase))
                     continue;
-                    
+
                 if (exactMatch)
                 {
                     // Check for exact match
@@ -962,38 +1107,38 @@ namespace ScreenTranslation
                     // Remove the phrase from the text
                     string before = filteredText;
                     filteredText = filteredText.Replace(phrase, "", StringComparison.OrdinalIgnoreCase);
-                    
+
                     if (before != filteredText)
                     {
                         //Console.WriteLine($"Applied non-exact match filter: '{phrase}' removed from text");
                     }
                 }
             }
-            
+
             // Check if after removing non-exact-match phrases, the text is empty or whitespace
             if (string.IsNullOrWhiteSpace(filteredText))
             {
                 Console.WriteLine("Ignoring text because it's empty after filtering");
                 return (true, string.Empty);
             }
-            
+
             // Return the filtered text if it changed
             if (filteredText != text)
             {
                 //Console.WriteLine($"Text filtered: '{text}' -> '{filteredText}'");
                 return (false, filteredText);
             }
-            
+
             return (false, text);
         }
-        
+
         // Display OCR results from JSON - processes character-level blocks
         private void DisplayOcrResults(JsonElement root)
         {
             try
             {
                 // Check for results array
-                if (root.TryGetProperty("results", out JsonElement resultsElement) && 
+                if (root.TryGetProperty("results", out JsonElement resultsElement) &&
                     resultsElement.ValueKind == JsonValueKind.Array)
                 {
                     // Get processing time if available
@@ -1002,43 +1147,43 @@ namespace ScreenTranslation
                     {
                         processingTime = timeElement.GetDouble();
                     }
-                    
+
                     // Get minimum text fragment size from config
                     int minTextFragmentSize = ConfigManager.Instance.GetMinTextFragmentSize();
-                    
+
                     // Clear existing text objects before adding new ones
                     ClearAllTextObjects();
-                    
+
                     // Process text blocks that have already been grouped by CharacterBlockDetectionManager
                     int resultCount = resultsElement.GetArrayLength();
-                    
+
                     for (int i = 0; i < resultCount; i++)
                     {
                         JsonElement item = resultsElement[i];
-                        
-                        if (item.TryGetProperty("text", out JsonElement textElement) && 
+
+                        if (item.TryGetProperty("text", out JsonElement textElement) &&
                             item.TryGetProperty("confidence", out JsonElement confElement))
                         {
                             // Get the text and ensure it's properly decoded from Unicode
                             string text = textElement.GetString() ?? "";
-                            
+
                             // Skip if text is smaller than minimum fragment size
                             if (text.Length < minTextFragmentSize)
                             {
                                 continue;
                             }
-                            
+
                             // Note: We no longer need to filter ignore phrases here
                             // as it's now done earlier in ProcessReceivedTextJsonData before hash generation
 
 
                             double confidence = confElement.GetDouble();
-                            
+
                             // Extract bounding box coordinates if available
                             double x = 0, y = 0, width = 0, height = 0;
-                            
+
                             // Check for "rect" property (polygon points format)
-                            if (item.TryGetProperty("rect", out JsonElement boxElement) && 
+                            if (item.TryGetProperty("rect", out JsonElement boxElement) &&
                                 boxElement.ValueKind == JsonValueKind.Array)
                             {
                                 try
@@ -1047,23 +1192,23 @@ namespace ScreenTranslation
                                     // Calculate bounding box from polygon points
                                     double minX = double.MaxValue, minY = double.MaxValue;
                                     double maxX = double.MinValue, maxY = double.MinValue;
-                                    
+
                                     // Iterate through each point
                                     for (int p = 0; p < boxElement.GetArrayLength(); p++)
                                     {
-                                        if (boxElement[p].ValueKind == JsonValueKind.Array && 
+                                        if (boxElement[p].ValueKind == JsonValueKind.Array &&
                                             boxElement[p].GetArrayLength() >= 2)
                                         {
                                             double pointX = boxElement[p][0].GetDouble();
                                             double pointY = boxElement[p][1].GetDouble();
-                                            
+
                                             minX = Math.Min(minX, pointX);
                                             minY = Math.Min(minY, pointY);
                                             maxX = Math.Max(maxX, pointX);
                                             maxY = Math.Max(maxY, pointY);
                                         }
                                     }
-                                    
+
                                     // Set coordinates to the calculated bounding box
                                     x = minX;
                                     y = minY;
@@ -1075,11 +1220,11 @@ namespace ScreenTranslation
                                     Console.WriteLine($"Error parsing rect: {ex.Message}");
                                 }
                             }
-                            
+
                             // Handle dpiscale for multi monitor
                             double dpiScale = MonitorWindow.Instance.dpiScale;
                             CreateTextObjectAtPosition(text, x, y, width / dpiScale, height / dpiScale, confidence);
-                                
+
                         }
                     }
                 }
@@ -1090,7 +1235,7 @@ namespace ScreenTranslation
                 OnFinishedThings(true);
             }
         }
-        
+
         // Create a text object at the specified position with confidence info
         private void CreateTextObjectAtPosition(string text, double x, double y, double width, double height, double confidence)
         {
@@ -1101,81 +1246,81 @@ namespace ScreenTranslation
                 if (!Application.Current.Dispatcher.CheckAccess())
                 {
                     // Run on UI thread to ensure STA compliance
-                    Application.Current.Dispatcher.Invoke(() => 
+                    Application.Current.Dispatcher.Invoke(() =>
                         CreateTextObjectAtPosition(text, x, y, width, height, confidence));
                     return;
                 }
-                
+
                 // Store current capture position with the text object
                 int captureX = _currentCaptureX;
                 int captureY = _currentCaptureY;
-                
+
                 // Validate input parameters
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     Console.WriteLine("Cannot create text object with empty text");
                     return;
                 }
-                
+
                 // Ensure width and height are valid
                 if (double.IsNaN(width) || double.IsInfinity(width) || width < 0)
                 {
                     width = 0; // Let the text determine natural width
                 }
-                
+
                 if (double.IsNaN(height) || double.IsInfinity(height) || height < 0)
                 {
                     height = 0; // Let the text determine natural height
                 }
-                
+
                 // Ensure coordinates are valid
                 if (double.IsNaN(x) || double.IsInfinity(x))
                 {
                     x = 10; // Default x position
                 }
-                
+
                 if (double.IsNaN(y) || double.IsInfinity(y))
                 {
                     y = 10; // Default y position
                 }
-                
+
                 // Create default font size based on height
                 int fontSize = 18;  // Default
                 if (height > 0)
                 {
-                    double fontSizeRatio = 0.9; 
-                    
+                    double fontSizeRatio = 0.9;
+
 
                     string sourceLanguage = GetSourceLanguage().ToLowerInvariant();
                     if (sourceLanguage == "ja" || sourceLanguage == "ch_sim" || sourceLanguage == "ko")
                     {
-                        
+
                         fontSizeRatio = 0.95;
                     }
                     else if (sourceLanguage == "vi" || sourceLanguage == "th")
                     {
-                        
+
                         fontSizeRatio = 0.85;
                     }
-                    
-                    
+
+
                     fontSize = Math.Max(10, Math.Min(36, (int)(height * fontSizeRatio)));
-                    
-                    
+
+
                     if (width > 0 && text.Length > 0)
                     {
                         double charDensity = text.Length / width;
-                        if (charDensity > 0.5) 
+                        if (charDensity > 0.5)
                         {
                             fontSize = Math.Max(10, (int)(fontSize * 0.9));
                         }
                     }
                 }
-                
+
                 // Create text object with Yellow text on semi-transparent black background
                 SolidColorBrush textColor = new SolidColorBrush(ConfigManager.Instance.GetOverlayTextColor());
                 SolidColorBrush bgColor = new SolidColorBrush(ConfigManager.Instance.GetOverlayBackgroundColor());
-                
+
                 // Add the text object to the UI
                 TextObject textObject = new TextObject(
                     text,  // Just the text, without confidence
@@ -1184,17 +1329,17 @@ namespace ScreenTranslation
                     bgColor,
                     captureX, captureY  // Store original capture coordinates
                 );
-                textObject.ID = "text_"+GetNextTextID();
+                textObject.ID = "text_" + GetNextTextID();
 
                 // Adjust font size
                 if (textObject.UIElement is Border border && border.Child is TextBlock textBlock)
                 {
                     textBlock.FontSize = fontSize;
                 }
-                
+
                 // Add to our collection
                 _textObjects.Add(textObject);
-                
+
                 // Raise event to notify listeners (MonitorWindow)
                 TextObjectAdded?.Invoke(this, textObject);
 
@@ -1202,32 +1347,29 @@ namespace ScreenTranslation
                     && ConfigManager.Instance.IsAutoTranslateEnabled())
                 {
                     //do nothing, don't want to show the source language
-                } else
+                }
+                else
                 {
                     textObject.UIElement = textObject.CreateUIElement();
                 }
-                    MonitorWindow.Instance.CreateMonitorOverlayFromTextObject(this, textObject);
+                MonitorWindow.Instance.CreateMonitorOverlayFromTextObject(this, textObject);
 
                 // Console.WriteLine($"Added text '{text}' at position ({x}, {y}) with size {width}x{height}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating text object: {ex.Message}");
-                if (ex.StackTrace != null)
-                {
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                }
+                Console.WriteLine($"[TEXT OBJECT ERROR] {ex.Message}");
             }
         }
-        
-        
+
+
         // Set the current capture position
         public void SetCurrentCapturePosition(int x, int y)
         {
             _currentCaptureX = x;
             _currentCaptureY = y;
         }
-        
+
         // Update text object positions based on capture position changes
         public void UpdateTextObjectPositions(int offsetX, int offsetY)
         {
@@ -1235,31 +1377,31 @@ namespace ScreenTranslation
             {
                 // Only proceed if we have text objects
                 if (_textObjects.Count == 0) return;
-                
+
                 // Check if we need to run on the UI thread
                 if (!Application.Current.Dispatcher.CheckAccess())
                 {
                     // Run on UI thread to ensure UI updates are thread-safe
-                    Application.Current.Dispatcher.Invoke(() => 
+                    Application.Current.Dispatcher.Invoke(() =>
                         UpdateTextObjectPositions(offsetX, offsetY));
                     return;
                 }
-                
+
                 foreach (TextObject textObj in _textObjects)
                 {
                     // Calculate new position based on original capture position and current offset
                     // Use negative offset since we want text to move in opposite direction of the window
                     double newX = textObj.X - offsetX;
                     double newY = textObj.Y - offsetY;
-                    
+
                     // Update position
                     textObj.X = newX;
                     textObj.Y = newY;
-                    
+
                     // Update UI element
                     textObj.UpdateUIElement();
                 }
-                
+
                 // Refresh the monitor window to show updated positions
                 if (MonitorWindow.Instance.IsVisible)
                 {
@@ -1271,7 +1413,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error updating text positions: {ex.Message}");
             }
         }
-        
+
         /// <summary>
         /// Filters out low-confidence characters from the OCR results
         /// </summary>
@@ -1279,24 +1421,24 @@ namespace ScreenTranslation
         {
             if (resultsElement.ValueKind != JsonValueKind.Array)
                 return resultsElement;
-                
+
             try
             {
                 // Get minimum confidence threshold from config
                 double minLetterConfidence = ConfigManager.Instance.GetMinLetterConfidence();
-                
+
                 // Create output array for high-confidence results only
                 using (var ms = new MemoryStream())
                 {
                     using (var writer = new Utf8JsonWriter(ms))
                     {
                         writer.WriteStartArray();
-                        
+
                         // Process each element
                         for (int i = 0; i < resultsElement.GetArrayLength(); i++)
                         {
                             var item = resultsElement[i];
-                            
+
                             // Skip items that don't have required properties
                             if (!item.TryGetProperty("confidence", out var confElement))
                             {
@@ -1304,20 +1446,20 @@ namespace ScreenTranslation
                                 item.WriteTo(writer);
                                 continue;
                             }
-                            
+
                             // Get confidence value
                             double confidence = confElement.GetDouble();
-                            
+
                             // Only include elements with confidence above threshold
                             if (confidence >= minLetterConfidence)
                             {
                                 item.WriteTo(writer);
                             }
                         }
-                        
+
                         writer.WriteEndArray();
                         writer.Flush();
-                        
+
                         // Read the filtered JSON back
                         ms.Position = 0;
                         using (JsonDocument doc = JsonDocument.Parse(ms))
@@ -1385,12 +1527,12 @@ namespace ScreenTranslation
             if (string.IsNullOrEmpty(text))
                 return string.Empty;
 
-            
+
             text = text.ToLowerInvariant();
-            
+
             StringBuilder sb = new StringBuilder();
             bool lastWasSpace = true; // Start with a space to handle leading characters
-            
+
             foreach (char c in text)
             {
                 if (c == 'ツ')
@@ -1407,145 +1549,124 @@ namespace ScreenTranslation
                         lastWasSpace = true;
                     }
                 }
-                
+
                 else if (!g_charsToStripFromHash.Contains(c))
                 {
                     sb.Append(c);
                     lastWasSpace = false;
                 }
             }
-            
+
             // Remove whiespace if it's at the end
             string result = sb.ToString();
             if (result.Length > 0 && result[result.Length - 1] == ' ')
             {
                 result = result.Substring(0, result.Length - 1);
             }
-            
+
             return result;
         }
-       
-        // Process bitmap directly with Windows OCR (no file saving)
-        public async void ProcessWithWindowsOCR(System.Drawing.Bitmap bitmap, string sourceLanguage)
+
+        // Process bitmap directly with OneOCR (no file saving)
+        public async void ProcessWithOneOCR(string imagePath, string sourceLanguage)
         {
             try
             {
-                //Console.WriteLine("Starting Windows OCR processing directly from bitmap...");
-                
-                try
+                // Get the OCR text from OneOCR directly from image file
+                var ocrText = await OneOCRManager.Instance.GetOcrTextFromFileAsync(imagePath, sourceLanguage);
+
+                // Process and display the OCR text
+                await OneOCRManager.Instance.ProcessOneOcrText(ocrText, sourceLanguage);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[OCR ERROR] Failed to process with OneOCR: {ex.Message}");
+                MainWindow.Instance.SetOCRCheckIsWanted(true);
+            }
+        }
+
+        // Using OneOCR integration with other OCR
+        public async void ProcessWithOneOCRIntegration(System.Drawing.Bitmap bitmap, string sourceLanguage, string filePath)
+        {
+            try
+            {
+                // Get the OCR text from OneOCR directly from image file
+                var ocrText = await OneOCRManager.Instance.GetOcrTextFromFileAsync(filePath, sourceLanguage);
+
+                if (!string.IsNullOrWhiteSpace(ocrText))
                 {
-                    // Get the text lines from Windows OCR directly from the bitmap
-                    var textLines = await WindowsOCRManager.Instance.GetOcrLinesFromBitmapAsync(bitmap, sourceLanguage);
-                   // Console.WriteLine($"Windows OCR found {textLines.Count} text lines");
-                    
-                    // Process the OCR results with language code
-                    await WindowsOCRManager.Instance.ProcessWindowsOcrResults(textLines, sourceLanguage);
+                    Console.WriteLine("[OCR] OneOCR found text, using server OCR for detailed processing");
+                    SendImageToServerOCR(filePath);
                 }
-                catch (Exception ex)
+                else
                 {
-                    Console.WriteLine($"Windows OCR error: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    Console.WriteLine("[OCR] OneOCR: No text detected, falling back to server OCR");
+                    await OneOCRManager.Instance.ProcessOneOcrText(ocrText, sourceLanguage);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing bitmap with Windows OCR: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
-            finally
-            {
-                // Make sure bitmap is properly disposed
-                try
-                {
-                    // Dispose bitmap - System.Drawing.Bitmap doesn't have a Disposed property,
-                    // so we'll just dispose it if it's not null
-                    if (bitmap != null)
-                    {
-                        bitmap.Dispose();
-                    }
-                }
-                catch
-                {
-                    // Ignore disposal errors
-                }
-
+                Console.WriteLine($"[OCR ERROR] OneOCR integration failed: {ex.Message}");
                 MainWindow.Instance.SetOCRCheckIsWanted(true);
-
             }
         }
 
-        // Using Windows OCR integration with other OCR
-        public async void ProcessWithWindowsOCRIntegration(System.Drawing.Bitmap bitmap, string sourceLanguage, string filePath)
+        // Determine which OCR engine to use based on user selection and load balancing
+        private OcrEngine DetermineOcrEngineToUse(string selectedMethod)
         {
-            try
+            // If user selected "Auto" or similar, use best engine
+            if (selectedMethod == "Auto" || string.IsNullOrEmpty(selectedMethod))
             {
-                try
-                {
-                    // Get the text lines from Windows OCR directly from the bitmap
-                    var textLines = await WindowsOCRManager.Instance.GetOcrLinesFromBitmapAsync(bitmap, sourceLanguage);
-
-                    if (textLines.Count > 0)
-                    {
-                        SendImageToServerOCR(filePath);
-                    }
-                    else
-                    {
-                        // Windows OCR didn't find any text
-                        Console.WriteLine("Windows OCR integration: No text detected in the image");
-                        
-                        await WindowsOCRManager.Instance.ProcessWindowsOcrResults(textLines, sourceLanguage);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Windows OCR error: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                }
-
+                return GetBestOcrEngine();
             }
-            catch (Exception ex)
+
+            // Convert string to enum
+            OcrEngine requestedEngine = selectedMethod switch
             {
-                Console.WriteLine($"Error processing bitmap with Windows OCR: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
-            finally
+                "PaddleOCR" => OcrEngine.PaddleOCR,
+                "OneOCR" => OcrEngine.OneOCR,
+                _ => OcrEngine.OneOCR
+            };
+
+            // Check if requested engine is available
+            if (_engineMetrics.TryGetValue(requestedEngine, out var metrics) && metrics.IsAvailable)
             {
-                // Make sure bitmap is properly disposed
-                try
-                {
-                    // Dispose bitmap - System.Drawing.Bitmap doesn't have a Disposed property,
-                    // so we'll just dispose it if it's not null
-                    if (bitmap != null)
-                    {
-                        bitmap.Dispose();
-                    }
-                }
-                catch
-                {
-                    // Ignore disposal errors
-                }
-
-                MainWindow.Instance.SetOCRCheckIsWanted(true);
-
+                return requestedEngine;
             }
+
+            // If requested engine is not available, use fallback
+            Console.WriteLine($"Requested OCR engine {selectedMethod} is not available, using fallback");
+            return GetBestOcrEngine();
         }
-     
-        
-        // Called when a screenshot is saved (for EasyOCR method)
+
+        // Called when a screenshot is saved (for OCR processing)
         public async void SendImageToServerOCR(string filePath)
         {
             // Update Monitor Window with the screenshot
 
             try
             {
-                // Check if we're using Windows OCR or EasyOCR or PaddleOCR
-                string ocrMethod = MainWindow.Instance.GetSelectedOcrMethod();
+                // Get selected OCR method from UI
+                string selectedOcrMethod = MainWindow.Instance.GetSelectedOcrMethod();
 
-                if (ocrMethod == "Windows OCR")
+                // Determine which OCR engine to use with load balancing
+                OcrEngine engineToUse = DetermineOcrEngineToUse(selectedOcrMethod);
+
+                // Convert enum to string for compatibility
+                string ocrMethod = engineToUse switch
                 {
-                    // Windows OCR doesn't require socket connection
-                    Console.WriteLine("Using Windows OCR (built-in)");
-                    // ProcessScreenshot will handle the Windows OCR logic
+                    OcrEngine.PaddleOCR => "PaddleOCR",
+                    OcrEngine.OneOCR => "OneOCR",
+                    _ => "OneOCR"
+                };
+
+                Console.WriteLine($"Selected OCR method: {selectedOcrMethod}, Using engine: {ocrMethod}");
+
+                if (ocrMethod == "OneOCR")
+                {
+                    // OneOCR doesn't require socket connection
+                    Console.WriteLine("Using OneOCR (built-in)");
+                    // ProcessScreenshot will handle the OneOCR logic
                 }
                 else
                 {
@@ -1561,7 +1682,7 @@ namespace ScreenTranslation
 
                     Console.WriteLine($"Processing screenshot with {ocrMethod} character-level OCR, language: {sourceLanguage}");
 
-                    // Check socket connection for EasyOCR or PaddleOCR
+                    // Check socket connection for PaddleOCR
                     if (!SocketManager.Instance.IsConnected)
                     {
                         Console.WriteLine("Socket not connected, attempting to reconnect...");
@@ -1609,8 +1730,7 @@ namespace ScreenTranslation
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing screenshot: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"[OCR ERROR] Failed to process screenshot: {ex.Message}");
                 MessageBox.Show($"Error processing screenshot: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -1626,29 +1746,29 @@ namespace ScreenTranslation
             {
                 // Clean up resources
                 Console.WriteLine("Logic finalized");
-                
+
                 // Disconnect from socket server
                 SocketManager.Instance.Disconnect();
-                
+
                 // Stop the reconnect timer
                 _reconnectTimer.Stop();
-                
+
                 // Clear all text objects
                 ClearAllTextObjects();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during cleanup: {ex.Message}", "Error", 
+                MessageBox.Show($"Error during cleanup: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-       
-        
+
+
         // Add a text object with specific text and optional position and styling
-        public void AddTextObject(string text, 
-                                 double x = 0, 
-                                 double y = 0, 
-                                 double width = 0, 
+        public void AddTextObject(string text,
+                                 double x = 0,
+                                 double y = 0,
+                                 double width = 0,
                                  double height = 0,
                                  SolidColorBrush? textColor = null,
                                  SolidColorBrush? backgroundColor = null)
@@ -1661,30 +1781,30 @@ namespace ScreenTranslation
                     Console.WriteLine("Cannot add text object with empty text");
                     return;
                 }
-                
+
                 // Ensure position and dimensions are valid
                 if (double.IsNaN(x) || double.IsInfinity(x)) x = 0;
                 if (double.IsNaN(y) || double.IsInfinity(y)) y = 0;
                 if (double.IsNaN(width) || double.IsInfinity(width) || width < 0) width = 0;
                 if (double.IsNaN(height) || double.IsInfinity(height) || height < 0) height = 0;
-               
+
                 backgroundColor ??= new SolidColorBrush(Color.FromArgb(128, 0, 0, 0)); // Half-transparent black
-                
+
                 // Create the text object with specified parameters
                 TextObject textObject = new TextObject(
-                    text, 
-                    x, y, 
-                    width, height, 
-                    textColor, 
+                    text,
+                    x, y,
+                    width, height,
+                    textColor,
                     backgroundColor);
-                
+
                 // Add to our collection
                 _textObjects.Add(textObject);
-                
+
                 // Don't add to main window UI anymore
                 // Just raise the event to notify MonitorWindow
                 TextObjectAdded?.Invoke(this, textObject);
-                
+
                 Console.WriteLine($"Added text '{text}' at position {x}, {y}");
             }
             catch (Exception ex)
@@ -1692,8 +1812,8 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error adding text: {ex.Message}");
             }
         }
-        
-     
+
+
         // Clear all text objects
         public void ClearAllTextObjects()
         {
@@ -1706,12 +1826,12 @@ namespace ScreenTranslation
                     Application.Current.Dispatcher.Invoke(() => ClearAllTextObjects());
                     return;
                 }
-                
+
                 // Clear the collection
                 _textObjects.Clear();
                 _textIDCounter = 0;
                 // No need to remove from the main window UI anymore
-                
+
                 Console.WriteLine("All text objects cleared");
             }
             catch (Exception ex)
@@ -1723,7 +1843,7 @@ namespace ScreenTranslation
                 }
             }
         }
-        
+
         // Send text data through socket
         public async Task<bool> SendTextDataAsync(string text)
         {
@@ -1732,7 +1852,7 @@ namespace ScreenTranslation
                 Console.WriteLine("Cannot send data: Socket not connected");
                 return false;
             }
-            
+
             try
             {
                 return await SocketManager.Instance.SendDataAsync(text);
@@ -1755,34 +1875,34 @@ namespace ScreenTranslation
                     textBlocksElement.ValueKind == JsonValueKind.Array)
                 {
                     Console.WriteLine($"Found {textBlocksElement.GetArrayLength()} text blocks in translated JSON");
-                    
+
                     // Get current target language
                     string targetLanguage = ConfigManager.Instance.GetTargetLanguage().ToLower();
                     Console.WriteLine($"Target language: ----------------------------{targetLanguage}");
                     // Define RTL (Right-to-Left) languages
-                    HashSet<string> rtlLanguages = new HashSet<string> { 
-                        "ar", "arabic", "fa", "farsi", "persian", "he", "hebrew", "ur", "urdu" 
+                    HashSet<string> rtlLanguages = new HashSet<string> {
+                        "ar", "arabic", "fa", "farsi", "persian", "he", "hebrew", "ur", "urdu"
                     };
-                    
+
                     // Check if target language is RTL
                     bool isRtlLanguage = rtlLanguages.Contains(targetLanguage);
-                    
+
                     if (isRtlLanguage)
                     {
                         Console.WriteLine($"Detected RTL language: {targetLanguage}");
                     }
-                    
+
                     // Process each translated block
                     for (int i = 0; i < textBlocksElement.GetArrayLength(); i++)
                     {
                         var block = textBlocksElement[i];
-                        
+
                         if (block.TryGetProperty("id", out JsonElement idElement) &&
                             block.TryGetProperty("text", out JsonElement translatedTextElement))
                         {
                             string id = idElement.GetString() ?? "";
                             string translatedText = translatedTextElement.GetString() ?? "";
-                            
+
                             if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(translatedText))
                             {
                                 // Find the matching text object by ID
@@ -1794,7 +1914,7 @@ namespace ScreenTranslation
                                     {
                                         // Set flow direction for RTL languages
                                         matchingTextObj.FlowDirection = FlowDirection.RightToLeft;
-                                        
+
                                         // Optionally add Unicode RLM (Right-to-Left Mark) if needed
                                         // This can help with mixed content
                                         if (!translatedText.StartsWith("\u200F"))
@@ -1807,7 +1927,7 @@ namespace ScreenTranslation
                                         // Ensure LTR for non-RTL languages
                                         matchingTextObj.FlowDirection = FlowDirection.LeftToRight;
                                     }
-                                    
+
                                     // Update the corresponding text object
                                     matchingTextObj.TextTranslated = translatedText;
                                     matchingTextObj.UpdateUIElement();
@@ -1824,7 +1944,7 @@ namespace ScreenTranslation
                                         {
                                             // Set flow direction for RTL languages
                                             _textObjects[index].FlowDirection = FlowDirection.RightToLeft;
-                                            
+
                                             // Optionally add Unicode RLM (Right-to-Left Mark) if needed
                                             if (!translatedText.StartsWith("\u200F"))
                                             {
@@ -1836,7 +1956,7 @@ namespace ScreenTranslation
                                             // Ensure LTR for non-RTL languages
                                             _textObjects[index].FlowDirection = FlowDirection.LeftToRight;
                                         }
-                                        
+
                                         // Update by index if ID matches format
                                         _textObjects[index].TextTranslated = translatedText;
                                         _textObjects[index].UpdateUIElement();
@@ -1885,7 +2005,7 @@ namespace ScreenTranslation
                 }
             }
         }
-        
+
         //!Process the finished translation into text blocks and the chatbox
         void ProcessTranslatedJSON(string translationResponse)
         {
@@ -1894,14 +2014,14 @@ namespace ScreenTranslation
                 // Check the service we're using to determine the format
                 string currentService = ConfigManager.Instance.GetCurrentTranslationService();
                 //Console.WriteLine($"Processing translation response from {currentService} service");
-                
+
                 // Log full response for debugging
                 //Console.WriteLine($"Raw translationResponse: {translationResponse}");
-                
+
                 // Parse the translation response
                 using JsonDocument doc = JsonDocument.Parse(translationResponse);
                 JsonElement textToProcess;
-                
+
                 // Different services have different response formats
                 if (currentService == "ChatGPT")
                 {
@@ -1910,10 +2030,10 @@ namespace ScreenTranslation
                     {
                         string translatedTextJson = translatedTextElement.GetString() ?? "";
                         Console.WriteLine($"ChatGPT translated_text: {translatedTextJson}");
-                        
+
                         // If the translated_text is a JSON string, parse it
-                        if (!string.IsNullOrEmpty(translatedTextJson) && 
-                            translatedTextJson.StartsWith("{") && 
+                        if (!string.IsNullOrEmpty(translatedTextJson) &&
+                            translatedTextJson.StartsWith("{") &&
                             translatedTextJson.EndsWith("}"))
                         {
                             try
@@ -1924,11 +2044,11 @@ namespace ScreenTranslation
                                     AllowTrailingCommas = true,
                                     CommentHandling = JsonCommentHandling.Skip
                                 };
-                                
+
                                 // Parse the inner JSON
                                 using JsonDocument innerDoc = JsonDocument.Parse(translatedTextJson, options);
                                 textToProcess = innerDoc.RootElement;
-                                
+
                                 // Process directly with this JSON
                                 ProcessStructuredJsonTranslation(textToProcess);
                                 return;
@@ -1947,6 +2067,149 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error in ProcessTranslatedJSON: {ex.Message}");
                 OnFinishedThings(true);
             }
+        }
+
+        // Prepare translation data for API call
+        private object PrepareTranslationData()
+        {
+            // Prepare JSON data for translation with rectangle coordinates
+            var textsToTranslate = new List<object>();
+            for (int i = 0; i < _textObjects.Count; i++)
+            {
+                var textObj = _textObjects[i];
+                if (textObj != null && !string.IsNullOrEmpty(textObj.Text))
+                {
+                    textsToTranslate.Add(new
+                    {
+                        id = textObj.ID,
+                        text = textObj.Text,
+                    });
+                }
+            }
+
+            // Get previous context if enabled
+            var previousContext = GetPreviousContext();
+
+            // Get game info if available
+            string gameInfo = ConfigManager.Instance.GetGameInfo();
+
+            // Create the full JSON object with OCR results, context and game info
+            var ocrData = new
+            {
+                source_language = MapLanguageCode(GetSourceLanguage()),
+                target_language = MapLanguageCode(GetTargetLanguage()),
+                text_blocks = textsToTranslate,
+                previous_context = previousContext,
+                game_info = gameInfo
+            };
+
+            return ocrData;
+        }
+
+        // Show translation status on UI
+        private void ShowTranslationStatus()
+        {
+            MonitorWindow.Instance.ShowTranslationStatus(false);
+
+            // Also show translation status in ChatBoxWindow if it's open
+            if (ChatBoxWindow.Instance != null)
+            {
+                ChatBoxWindow.Instance.ShowTranslationStatus(false);
+            }
+        }
+
+        // Process translation response
+        private async Task ProcessTranslationResponse(string jsonToTranslate, string prompt)
+        {
+            // Log the LLM request
+            LogManager.Instance.LogLlmRequest(prompt, jsonToTranslate);
+
+            _translationStopwatch.Restart();
+
+            SetWaitingForTranslationToFinish(true);
+
+            // Create translation service based on current configuration
+            ITranslationService translationService = TranslationServiceFactory.CreateService();
+            string currentService = ConfigManager.Instance.GetCurrentTranslationService();
+
+            // Call the translation API with the modified prompt if context exists
+            string? translationResponse = await translationService.TranslateAsync(jsonToTranslate, prompt);
+
+            if (string.IsNullOrEmpty(translationResponse))
+            {
+                    Console.WriteLine($"[TRANSLATION ERROR] Empty response from {currentService}");
+
+                // When translation fails, add the original OCR text to chatbox as fallback
+                try
+                {
+                    using JsonDocument doc = JsonDocument.Parse(jsonToTranslate);
+                    if (doc.RootElement.TryGetProperty("text_blocks", out JsonElement textBlocksElement) &&
+                        textBlocksElement.ValueKind == JsonValueKind.Array)
+                    {
+                        var sortedTextObjects = _textObjects.OrderBy(t => t.Y).ToList();
+                        for (int i = 0; i < Math.Min(textBlocksElement.GetArrayLength(), sortedTextObjects.Count); i++)
+                        {
+                            var block = textBlocksElement[i];
+                            if (block.TryGetProperty("text", out JsonElement textElement))
+                            {
+                                string originalText = textElement.GetString() ?? "";
+                                if (!string.IsNullOrEmpty(originalText) && sortedTextObjects[i] != null)
+                                {
+                                    // Add to TranslationCompleted with original text as translated text (indicating translation failed)
+                                    TranslationCompleted?.Invoke(this, new TranslationEventArgs
+                                    {
+                                        OriginalText = originalText,
+                                        TranslatedText = originalText // Use original text when translation fails
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[TRANSLATION ERROR] Failed to add text to chatbox: {ex.Message}");
+                }
+
+                OnFinishedThings(true);
+                return;
+            }
+
+            _translationStopwatch.Stop();
+            Console.WriteLine($"[TRANSLATION] ✓ Completed in {_translationStopwatch.ElapsedMilliseconds}ms");
+
+            ProcessTranslatedJSON(translationResponse);
+            if (!ConfigManager.Instance.IsAutoOCREnabled())
+            {
+                MainWindow.Instance.isStopOCR = true;
+            }
+        }
+
+        // Validate text objects before translation
+        private bool ValidateTextObjectsForTranslation()
+        {
+            if (_textObjects.Count == 0)
+            {
+                return false;
+            }
+
+            // Check if we have any valid text objects
+            bool hasValidText = false;
+            foreach (var textObj in _textObjects)
+            {
+                if (textObj != null && !string.IsNullOrEmpty(textObj.Text))
+                {
+                    hasValidText = true;
+                    break;
+                }
+            }
+
+            if (!hasValidText)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private string MapLanguageCode(string language)
@@ -1977,58 +2240,16 @@ namespace ScreenTranslation
             try
             {
                 // Show translation status at the beginning
-                MonitorWindow.Instance.ShowTranslationStatus(false);
+                ShowTranslationStatus();
 
-                // Also show translation status in ChatBoxWindow if it's open
-                if (ChatBoxWindow.Instance != null)
+                if (!ValidateTextObjectsForTranslation())
                 {
-                    ChatBoxWindow.Instance.ShowTranslationStatus(false);
-                }
-
-                if (_textObjects.Count == 0)
-                {
-                    Console.WriteLine("No text objects to translate");
                     OnFinishedThings(true);
                     return;
                 }
 
-                // API key is handled by the translation service factory
-
-
-                // Prepare JSON data for translation with rectangle coordinates
-                var textsToTranslate = new List<object>();
-                for (int i = 0; i < _textObjects.Count; i++)
-                {
-                    var textObj = _textObjects[i];
-                    textsToTranslate.Add(new
-                    {
-                        id = textObj.ID,
-                        text = textObj.Text,
-                        // rect = new
-                        // {
-                        //     x = textObj.X,
-                        //     y = textObj.Y,
-                        //     width = textObj.Width,
-                        //     height = textObj.Height
-                        // }
-                    });
-                }
-
-                // Get previous context if enabled
-                var previousContext = GetPreviousContext();
-
-                // Get game info if available
-                string gameInfo = ConfigManager.Instance.GetGameInfo();
-
-                // Create the full JSON object with OCR results, context and game info
-                var ocrData = new
-                {
-                    source_language = MapLanguageCode(GetSourceLanguage()),
-                    target_language = MapLanguageCode(GetTargetLanguage()),
-                    text_blocks = textsToTranslate,
-                    previous_context = previousContext,
-                    game_info = gameInfo
-                };
+                // Prepare translation data
+                var ocrData = PrepareTranslationData();
 
                 var jsonOptions = new JsonSerializerOptions
                 {
@@ -2041,44 +2262,13 @@ namespace ScreenTranslation
                 string prompt = GetLlmPrompt();
                 prompt = prompt.Replace("source_language", MapLanguageCode(GetSourceLanguage())).Replace("target_language", MapLanguageCode(GetTargetLanguage()));
 
-                // Log the LLM request
-                LogManager.Instance.LogLlmRequest(prompt, jsonToTranslate);
+                // Process translation response
+                await ProcessTranslationResponse(jsonToTranslate, prompt);
 
-                _translationStopwatch.Restart();
-
-                SetWaitingForTranslationToFinish(true);
-
-                // Create translation service based on current configuration
-                ITranslationService translationService = TranslationServiceFactory.CreateService();
-                string currentService = ConfigManager.Instance.GetCurrentTranslationService();
-
-                // Call the translation API with the modified prompt if context exists
-                string? translationResponse = await translationService.TranslateAsync(jsonToTranslate, prompt);
-
-                if (string.IsNullOrEmpty(translationResponse))
-                {
-                    Console.WriteLine($"Translation failed with {currentService} - empty response");
-                    OnFinishedThings(true);
-                    return;
-                }
-
-                _translationStopwatch.Stop();
-                Console.WriteLine($"Translation took {_translationStopwatch.ElapsedMilliseconds} ms");
-
-                // We've already logged the raw LLM response in the respective service
-                // This would log the post-processed response, which we don't need
-                // LogManager.Instance.LogLlmReply(translationResponse);
-
-                ProcessTranslatedJSON(translationResponse);
-                if (!ConfigManager.Instance.IsAutoOCREnabled())
-                {
-                    MainWindow.Instance.isStopOCR = true;
-                }
-              
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error translating text objects: {ex.Message}");
+                Console.WriteLine($"[TRANSLATION ERROR] {ex.Message}");
                 OnFinishedThings(true);
             }
 
@@ -2086,7 +2276,7 @@ namespace ScreenTranslation
             OnFinishedThings(true);
         }
 
-     
+
         public string GetLlmPrompt()
         {
             return ConfigManager.Instance.GetLlmPrompt();
@@ -2107,7 +2297,7 @@ namespace ScreenTranslation
             //     // Return the content as string
             //     return selectedItem.Content?.ToString()!;
             // }
-            
+
             return ConfigManager.Instance.GetSourceLanguage();
         }
 
@@ -2118,7 +2308,7 @@ namespace ScreenTranslation
             {
                 return Application.Current.Dispatcher.Invoke(() => GetTargetLanguage());
             }
-            
+
             // // Find the MainWindow instance
             // var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
             // // Get the selected ComboBoxItem
@@ -2129,7 +2319,7 @@ namespace ScreenTranslation
             // }
             return ConfigManager.Instance.GetTargetLanguage();
         }
-        
+
         // Get previous context based on configuration settings
         private List<string> GetPreviousContext()
         {
@@ -2139,17 +2329,63 @@ namespace ScreenTranslation
             {
                 return new List<string>(); // Empty list if context is disabled
             }
-            
+
             int minContextSize = ConfigManager.Instance.GetMinContextSize();
-           
+
             // Get context from ChatBoxWindow's history
             if (ChatBoxWindow.Instance != null)
             {
                 return ChatBoxWindow.Instance.GetRecentOriginalTexts(maxContextPieces, minContextSize);
-               
+
             }
-            
+
             return new List<string>();
+        }
+
+        // Track OCR engine performance metrics
+        private void TrackOcrEnginePerformance(bool success, JsonElement? resultsElement)
+        {
+            try
+            {
+                // Get current OCR method to determine which engine was used
+                string currentMethod = MainWindow.Instance.GetSelectedOcrMethod();
+                OcrEngine engine = currentMethod switch
+                {
+                    "PaddleOCR" => OcrEngine.PaddleOCR,
+                    "OneOCR" => OcrEngine.OneOCR,
+                    _ => OcrEngine.OneOCR
+                };
+
+                double confidence = 0.0;
+                double processingTime = _ocrProcessingStopwatch.ElapsedMilliseconds;
+
+                if (success && resultsElement.HasValue)
+                {
+                    // Calculate average confidence from results
+                    double totalConfidence = 0.0;
+                    int count = 0;
+
+                    foreach (JsonElement item in resultsElement.Value.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("confidence", out JsonElement confElement))
+                        {
+                            totalConfidence += confElement.GetDouble();
+                            count++;
+                        }
+                    }
+
+                    if (count > 0)
+                    {
+                        confidence = totalConfidence / count;
+                    }
+                }
+
+                UpdateEngineMetrics(engine, success, confidence, processingTime);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error tracking OCR performance: {ex.Message}");
+            }
         }
     }
 }

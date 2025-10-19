@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace ScreenTranslation
 {
@@ -11,23 +8,23 @@ namespace ScreenTranslation
     {
         private static readonly HttpClient _httpClient = new HttpClient();
         private readonly string _configFilePath;
-        
+
         public ChatGptTranslationService()
         {
             // Set the base address for OpenAI API
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "WPFScreenCapture");
-            
+
             // Get the configuration file path
             string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
             _configFilePath = System.IO.Path.Combine(appDirectory, "chatgpt_config.txt");
-            
+
             // Ensure the config file exists
             if (!System.IO.File.Exists(_configFilePath))
             {
                 CreateDefaultConfigFile();
             }
         }
-        
+
         private void CreateDefaultConfigFile()
         {
             try
@@ -55,8 +52,8 @@ namespace ScreenTranslation
                 // Get model from config
                 string model = ConfigManager.Instance.GetChatGptModel();
 
-                // Construct full endpoint: baseEndpoint + /v1/ + model
-                string endpoint = $"{baseEndpoint.TrimEnd('/')}/v1/{model}";
+                // Construct full endpoint: baseEndpoint + /chatbot/api/ + model
+                string endpoint = $"{baseEndpoint.TrimEnd('/')}/chatbot/api/{model}";
 
                 // Validate we have required credentials
                 if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(baseEndpoint) || string.IsNullOrWhiteSpace(password))

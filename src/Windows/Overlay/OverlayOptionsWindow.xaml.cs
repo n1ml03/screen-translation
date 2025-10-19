@@ -1,15 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Forms;
 using Color = System.Windows.Media.Color;
 using Colors = System.Windows.Media.Colors;
-using FontFamily = System.Windows.Media.FontFamily;
-using Brushes = System.Windows.Media.Brushes;
 using MessageBox = System.Windows.MessageBox;
 
 namespace ScreenTranslation
@@ -19,11 +12,11 @@ namespace ScreenTranslation
         // Store original values for cancel operation
         private Color _originalBackgroundColor;
         private Color _originalTextColor;
-        
+
         // Store current values for apply operation
         private Color _currentBackgroundColor;
         private Color _currentTextColor;
-        
+
         // Default values
         private readonly Color DEFAULT_BACKGROUND_COLOR = Color.FromArgb(128, 0, 0, 0); // Dark background
         private readonly Color DEFAULT_TEXT_COLOR = Colors.White;
@@ -31,11 +24,11 @@ namespace ScreenTranslation
         public OverlayOptionsWindow()
         {
             InitializeComponent();
-            
-            
+
+
             // Load current settings from config
             LoadCurrentSettings();
-            
+
             // Update UI with loaded settings
             UpdateUIFromSettings();
         }
@@ -76,11 +69,11 @@ namespace ScreenTranslation
                 // Update background color
                 backgroundColorButton.Background = new SolidColorBrush(_currentBackgroundColor);
                 backgroundColorText.Text = ColorToHexString(_currentBackgroundColor);
-                
+
                 // Update text color
                 textColorButton.Background = new SolidColorBrush(_currentTextColor);
                 textColorText.Text = ColorToHexString(_currentTextColor);
-                
+
             }
             catch (Exception ex)
             {
@@ -97,45 +90,45 @@ namespace ScreenTranslation
         {
             // Create color dialog
             var colorDialog = new ColorDialog();
-            
+
             // Set the initial color (ignore alpha, we handle that separately)
             colorDialog.Color = System.Drawing.Color.FromArgb(
-                255, 
-                _currentBackgroundColor.R, 
-                _currentBackgroundColor.G, 
+                255,
+                _currentBackgroundColor.R,
+                _currentBackgroundColor.G,
                 _currentBackgroundColor.B);
-            
+
             // Show dialog
             if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 // Get selected color
                 _currentBackgroundColor = Color.FromArgb(
-                    255, 
+                    255,
                     colorDialog.Color.R,
                     colorDialog.Color.G,
                     colorDialog.Color.B);
-                
+
                 // Update UI
                 backgroundColorButton.Background = new SolidColorBrush(_currentBackgroundColor);
-                backgroundColorText.Text = ColorToHexString(Color.FromArgb(255, _currentBackgroundColor.R, 
-                                                                   _currentBackgroundColor.G, 
+                backgroundColorText.Text = ColorToHexString(Color.FromArgb(255, _currentBackgroundColor.R,
+                                                                   _currentBackgroundColor.G,
                                                                    _currentBackgroundColor.B));
             }
         }
-        
+
 
         private void TextColorButton_Click(object sender, RoutedEventArgs e)
         {
             // Create color dialog
             var colorDialog = new ColorDialog();
-            
+
             // Set the initial color
             colorDialog.Color = System.Drawing.Color.FromArgb(
-                _currentTextColor.A, 
-                _currentTextColor.R, 
-                _currentTextColor.G, 
+                _currentTextColor.A,
+                _currentTextColor.R,
+                _currentTextColor.G,
                 _currentTextColor.B);
-            
+
             // Show dialog
             if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
@@ -145,7 +138,7 @@ namespace ScreenTranslation
                     colorDialog.Color.R,
                     colorDialog.Color.G,
                     colorDialog.Color.B);
-                
+
                 // Update UI
                 textColorButton.Background = new SolidColorBrush(_currentTextColor);
                 textColorText.Text = ColorToHexString(_currentTextColor);
@@ -160,10 +153,10 @@ namespace ScreenTranslation
                 ConfigManager.Instance.SetValue(ConfigManager.OVERLAY_BACKGROUND_COLOR, ColorToHexString(
                     Color.FromArgb(255, _currentBackgroundColor.R, _currentBackgroundColor.G, _currentBackgroundColor.B)));
                 ConfigManager.Instance.SetValue(ConfigManager.OVERLAY_TEXT_COLOR, ColorToHexString(_currentTextColor));
-                
+
                 // Save config to file
                 ConfigManager.Instance.SaveConfig();
-                
+
                 // Close the window
                 this.DialogResult = true;
                 this.Close();
@@ -181,17 +174,17 @@ namespace ScreenTranslation
             this.DialogResult = false;
             this.Close();
         }
-        
+
         private void DefaultsButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 // Reset to default values
                 SetDefaultValues();
-                
+
                 // Update UI with default values
                 UpdateUIFromSettings();
-                
+
                 // Create flash animation for visual feedback
                 CreateFlashAnimation(defaultsButton);
             }
@@ -200,24 +193,24 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error setting defaults: {ex.Message}");
             }
         }
-        
+
         private void CreateFlashAnimation(System.Windows.Controls.Button button)
         {
             try
             {
                 // Get the current background brush
                 SolidColorBrush? currentBrush = button.Background as SolidColorBrush;
-                
+
                 if (currentBrush != null)
                 {
                     // Need to freeze the original brush to animate its clone
                     currentBrush = currentBrush.Clone();
                     Color originalColor = currentBrush.Color;
-                    
+
                     // Create a new brush for animation
                     SolidColorBrush animBrush = new SolidColorBrush(originalColor);
                     button.Background = animBrush;
-                    
+
                     // Create color animation for the brush's Color property
                     var animation = new ColorAnimation
                     {
@@ -227,7 +220,7 @@ namespace ScreenTranslation
                         AutoReverse = true,
                         FillBehavior = FillBehavior.Stop // Stop the animation when complete
                     };
-                    
+
                     // Apply the animation to the brush's Color property
                     animBrush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
                 }

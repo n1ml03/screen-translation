@@ -1,18 +1,13 @@
-using System;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Input;
 using System.Diagnostics;
-using System.Windows.Forms; // For Control.ModifierKeys
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+using System.Windows.Input;
 
 namespace ScreenTranslation
 {
     public static class KeyboardShortcuts
     {
         #region Events
-        
+
         public static event EventHandler? StartStopRequested;
         public static event EventHandler? MonitorToggleRequested;
         public static event EventHandler? ChatBoxToggleRequested;
@@ -23,11 +18,11 @@ namespace ScreenTranslation
         // public static event EventHandler? MainWindowVisibilityToggleRequested;
         public static event EventHandler? SelectTranslationRegion;
         public static event EventHandler? ClearAreasRequested;
-        
+
         #endregion
-        
+
         #region Global Keyboard Hook
-        
+
         // For global keyboard hook
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, IntPtr hInstance, uint threadId);
@@ -40,40 +35,40 @@ namespace ScreenTranslation
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
-        
+
         // For window focus checking
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
-        
+
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-        
+
         // For getting key state
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
-        
+
         // For registering hotkeys
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-        
+
         [DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-        
+
         // Constants for RegisterHotKey
         private const uint MOD_ALT = 0x0001;
         private const uint MOD_NOREPEAT = 0x4000;
         private const uint MOD_CONTROL = 0x0002;
         private const uint MOD_SHIFT = 0x0004;
-        
+
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-        
+
         private const int WH_KEYBOARD_LL = 13;
         private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
         private const int WM_SYSKEYUP = 0x0105;
         private const int WM_HOTKEY = 0x0312;
-        
+
         // Virtual key codes
         private const int VK_SHIFT = 0x10;
         private const int VK_CONTROL = 0x11;
@@ -90,7 +85,7 @@ namespace ScreenTranslation
         private const int VK_3 = 0x33;    // 3 key
         private const int VK_4 = 0x34;    // 4 key
         private const int VK_5 = 0x35;    // 5 key
-        
+
         // Hotkey IDs
         private const int HOTKEY_ID_START_STOP = 1;
         private const int HOTKEY_ID_OVERLAY = 2;
@@ -110,19 +105,19 @@ namespace ScreenTranslation
         private static readonly Dictionary<string, EventHandler?> _functionHandlers = new Dictionary<string, EventHandler?>();
         private static readonly Dictionary<string, int> _keyCodeMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, (uint modifiers, int vkCode)> _parsedHotkeys = new Dictionary<string, (uint, int)>();
-        
+
         private static LowLevelKeyboardProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
-        
+
         // Reference to our window handles
         private static IntPtr _consoleWindowHandle = IntPtr.Zero;
         private static IntPtr _mainWindowHandle = IntPtr.Zero;
-        
+
         // Track the last key press time to prevent multiple triggers
         private static DateTime _lastKeyPressTime = DateTime.MinValue;
         private static int _lastKeyCode = 0;
         private static readonly TimeSpan _keyPressThreshold = TimeSpan.FromMilliseconds(300);
-        
+
         // Key polling system for global hotkeys only
         private static CancellationTokenSource? _pollingCts;
         private static bool _isPolling = false;
@@ -133,7 +128,7 @@ namespace ScreenTranslation
         public static event EventHandler? SelectArea3Requested;
         public static event EventHandler? SelectArea4Requested;
         public static event EventHandler? SelectArea5Requested;
-        
+
         static KeyboardShortcuts()
         {
             // Initialize function handlers
@@ -151,25 +146,25 @@ namespace ScreenTranslation
             _functionHandlers["Area 3"] = SelectArea3Requested;
             _functionHandlers["Area 4"] = SelectArea4Requested;
             _functionHandlers["Area 5"] = SelectArea5Requested;
-            
+
             // Initialize key code map
             for (int i = 0; i < 26; i++) // A-Z
             {
                 char key = (char)('A' + i);
                 _keyCodeMap[key.ToString()] = 0x41 + i;
             }
-            
+
             for (int i = 0; i <= 9; i++) // 0-9
             {
                 _keyCodeMap[i.ToString()] = 0x30 + i;
             }
-            
+
             // Function keys
             for (int i = 1; i <= 12; i++)
             {
                 _keyCodeMap[$"F{i}"] = 0x70 + i - 1;
             }
-            
+
             // Other common keys
             _keyCodeMap["SPACE"] = 0x20;
             _keyCodeMap["TAB"] = 0x09;
@@ -192,7 +187,7 @@ namespace ScreenTranslation
         public static void RefreshHotkeys()
         {
             _parsedHotkeys.Clear();
-            
+
             // Parse all hotkeys from config
             ParseHotkey("Start/Stop");
             ParseHotkey("Overlay");
@@ -215,14 +210,14 @@ namespace ScreenTranslation
             string hotkeyString = ConfigManager.Instance.GetHotKey(functionName);
             if (string.IsNullOrEmpty(hotkeyString))
                 return;
-                
+
             string[] parts = hotkeyString.Split('+');
             if (parts.Length < 2)
                 return;
-                
+
             uint modifiers = 0;
             string keyName = parts[parts.Length - 1].Trim().ToUpper();
-            
+
             // Parse modifiers
             for (int i = 0; i < parts.Length - 1; i++)
             {
@@ -240,7 +235,7 @@ namespace ScreenTranslation
                         break;
                 }
             }
-            
+
             // Get key code
             if (_keyCodeMap.TryGetValue(keyName, out int vkCode))
             {
@@ -258,7 +253,7 @@ namespace ScreenTranslation
         {
             // Parse all hotkeys from config
             RefreshHotkeys();
-            
+
             // Set up low-level keyboard hook
             if (_hookID == IntPtr.Zero) // Only set if not already set
             {
@@ -284,7 +279,7 @@ namespace ScreenTranslation
             // Start key polling as a backup method for global shortcuts only
             StartKeyPolling();
         }
-        
+
         // Set the main window handle for hotkey registration
         public static void SetMainWindowHandle(IntPtr mainWindowHandle)
         {
@@ -301,13 +296,13 @@ namespace ScreenTranslation
         {
             if (_mainWindowHandle == IntPtr.Zero)
                 return;
-                
+
             // Unregister any existing hotkeys first
             for (int i = 1; i <= 12; i++)
             {
                 UnregisterHotKey(_mainWindowHandle, i);
             }
-            
+
             // Register hotkeys from config
             RegisterFunctionHotkey("Start/Stop", HOTKEY_ID_START_STOP);
             RegisterFunctionHotkey("Overlay", HOTKEY_ID_OVERLAY);
@@ -331,7 +326,7 @@ namespace ScreenTranslation
             {
                 uint modifiers = hotkeyInfo.modifiers | MOD_NOREPEAT;
                 uint vkCode = (uint)hotkeyInfo.vkCode;
-                
+
                 if (RegisterHotKey(_mainWindowHandle, hotkeyId, modifiers, vkCode))
                 {
                     Console.WriteLine($"Registered {functionName} hotkey successfully");
@@ -343,7 +338,7 @@ namespace ScreenTranslation
                 }
             }
         }
-        
+
         // Process WM_HOTKEY messages in the main window
         public static bool ProcessHotKey(IntPtr wParam)
         {
@@ -380,7 +375,7 @@ namespace ScreenTranslation
                     Console.WriteLine("Hotkey detected: Select Area");
                     SelectTranslationRegion?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_CLEAR_AREAS:
                     Console.WriteLine("Hotkey detected: Clear Areas");
                     ClearAreasRequested?.Invoke(null, EventArgs.Empty);
@@ -395,36 +390,36 @@ namespace ScreenTranslation
                     Console.WriteLine("Hotkey detected: Show Area");
                     ShowAreaRequested?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_AREA_1:
                     Console.WriteLine("Hotkey detected: Area 1");
                     SelectArea1Requested?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_AREA_2:
                     Console.WriteLine("Hotkey detected: Area 2");
                     SelectArea2Requested?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_AREA_3:
                     Console.WriteLine("Hotkey detected: Area 3");
                     SelectArea3Requested?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_AREA_4:
                     Console.WriteLine("Hotkey detected: Area 4");
                     SelectArea4Requested?.Invoke(null, EventArgs.Empty);
                     return true;
-                    
+
                 case HOTKEY_ID_AREA_5:
                     Console.WriteLine("Hotkey detected: Area 5");
                     SelectArea5Requested?.Invoke(null, EventArgs.Empty);
                     return true;
             }
-            
+
             return false;
         }
-        
+
         // Process WM_HOTKEY messages in the main window
         public static void ProcessHandleHotKey(string function)
         {
@@ -500,7 +495,7 @@ namespace ScreenTranslation
             }
 
         }
-        
+
         // Start polling for key states as a backup method - ONLY for global shortcuts
         private static void StartKeyPolling()
         {
@@ -593,7 +588,7 @@ namespace ScreenTranslation
                 }
             }, _pollingCts.Token);
         }
-        
+
         // Stop the key polling
         private static void StopKeyPolling()
         {
@@ -604,7 +599,7 @@ namespace ScreenTranslation
                 _pollingCts = null;
             }
         }
-        
+
         // Remove the hook and unregister hotkeys
         public static void CleanupGlobalHook()
         {
@@ -619,7 +614,7 @@ namespace ScreenTranslation
                     UnregisterHotKey(_mainWindowHandle, i);
                 }
             }
-            
+
             // Remove low-level keyboard hook
             if (_hookID != IntPtr.Zero)
             {
@@ -628,36 +623,36 @@ namespace ScreenTranslation
                 Console.WriteLine("Global keyboard hook removed");
             }
         }
-        
+
         // Set the console window handle for proper hook handling
         public static void SetConsoleWindowHandle(IntPtr consoleHandle)
         {
             _consoleWindowHandle = consoleHandle;
         }
-        
+
         // Direct key state check for more reliable detection
         private static bool IsKeyPressed(int vkCode)
         {
             return (GetAsyncKeyState(vkCode) & 0x8000) != 0;
         }
-        
+
         // Check if we should process this key press (prevents double triggers)
         private static bool ShouldProcessKeyPress(int vkCode)
         {
             DateTime now = DateTime.Now;
-            
+
             // If it's the same key and within threshold time, ignore it
             if (vkCode == _lastKeyCode && (now - _lastKeyPressTime) < _keyPressThreshold)
             {
                 return false;
             }
-            
+
             // Update last key press info
             _lastKeyCode = vkCode;
             _lastKeyPressTime = now;
             return true;
         }
-        
+
         // Keyboard hook callback
         private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
@@ -675,7 +670,7 @@ namespace ScreenTranslation
                         {
                             string function = kvp.Key;
                             var (modifiers, keyCode) = kvp.Value;
-                            
+
                             if (vkCode == keyCode && ShouldProcessKeyPress(keyCode | 0x1000))
                             {
                                 // Check if all required modifiers are pressed
@@ -686,12 +681,12 @@ namespace ScreenTranslation
                                     modifiersMatch = false;
                                 if ((modifiers & MOD_SHIFT) != 0 && !IsKeyPressed(VK_SHIFT))
                                     modifiersMatch = false;
-                                    
+
                                 if (modifiersMatch)
                                 {
                                     Console.WriteLine($"Global shortcut detected: {function}");
                                     ProcessHandleHotKey(function);
-                                    
+
                                     // Invoke the associated event handler
                                     if (_functionHandlers.TryGetValue(function, out var handler) && handler != null)
                                     {
@@ -707,14 +702,14 @@ namespace ScreenTranslation
                                             Console.WriteLine($"Error invoking {function} action: {ex.Message}");
                                         }
                                     }
-                                    
+
                                     return (IntPtr)1; // Prevent further processing
                                 }
                             }
                         }
                     }
                 }
-                
+
                 // Call the next hook in the chain
                 return CallNextHookEx(_hookID, nCode, (int)wParam, lParam);
             }
@@ -724,7 +719,7 @@ namespace ScreenTranslation
                 return CallNextHookEx(_hookID, nCode, (int)wParam, lParam);
             }
         }
-        
+
         // Check if the foreground window belongs to our application process
         private static bool IsOurApplicationActive()
         {
@@ -732,20 +727,20 @@ namespace ScreenTranslation
             {
                 // Get the foreground window handle
                 IntPtr foregroundWindow = GetForegroundWindow();
-                
+
                 // Get the process ID for the foreground window
                 uint foregroundProcessId;
                 GetWindowThreadProcessId(foregroundWindow, out foregroundProcessId);
-                
+
                 // Check if it's our process ID
                 bool isOurProcessActive = (foregroundProcessId == (uint)Process.GetCurrentProcess().Id);
-                
+
                 // Also check if it's our console window
                 if (!isOurProcessActive && _consoleWindowHandle != IntPtr.Zero)
                 {
                     isOurProcessActive = (foregroundWindow == _consoleWindowHandle);
                 }
-                
+
                 return isOurProcessActive;
             }
             catch (Exception ex)
@@ -754,11 +749,11 @@ namespace ScreenTranslation
                 return false;
             }
         }
-        
+
         #endregion
-        
+
         #region Standard Shortcut Handling
-        
+
         // Handle shortcut keys - for regular window event handling
         public static bool HandleKeyDown(System.Windows.Input.KeyEventArgs e)
         {
@@ -766,7 +761,7 @@ namespace ScreenTranslation
             {
                 // Convert WPF key to virtual key code
                 int vkCode = KeyInterop.VirtualKeyFromKey(e.Key);
-                
+
                 // Check modifiers
                 uint modifiers = 0;
                 if ((e.KeyboardDevice.Modifiers & ModifierKeys.Alt) != 0)
@@ -775,13 +770,13 @@ namespace ScreenTranslation
                     modifiers |= MOD_CONTROL;
                 if ((e.KeyboardDevice.Modifiers & ModifierKeys.Shift) != 0)
                     modifiers |= MOD_SHIFT;
-                    
+
                 // Check if it matches any of our configured hotkeys
                 foreach (var kvp in _parsedHotkeys)
                 {
                     string function = kvp.Key;
                     var (configModifiers, configVkCode) = kvp.Value;
-                    
+
                     if (vkCode == configVkCode && modifiers == configModifiers)
                     {
                         // Invoke the associated event handler
@@ -798,10 +793,10 @@ namespace ScreenTranslation
             {
                 Console.WriteLine($"Error handling keyboard shortcut: {ex.Message}");
             }
-            
+
             return false;
         }
-        
+
         #endregion
     }
 }

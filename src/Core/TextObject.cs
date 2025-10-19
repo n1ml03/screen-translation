@@ -1,20 +1,17 @@
-﻿using System;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Input;
-using System.Windows.Media.Animation;
+﻿using System.Diagnostics;
 using System.Media;
 using System.Runtime.CompilerServices;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using Clipboard = System.Windows.Forms.Clipboard;
 using Color = System.Windows.Media.Color;
 using Cursors = System.Windows.Input.Cursors;
-using Clipboard = System.Windows.Forms.Clipboard;
+using FontFamily = System.Windows.Media.FontFamily;
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
-using FontFamily = System.Windows.Media.FontFamily;
 
 namespace ScreenTranslation
 {
@@ -85,7 +82,7 @@ namespace ScreenTranslation
                 VerticalAlignment = VerticalAlignment.Top,
                 Cursor = Cursors.Hand  // Change cursor to hand to indicate clickable
             };
-            
+
             // Position based on useRelativePosition parameter
             if (useRelativePosition)
             {
@@ -126,7 +123,7 @@ namespace ScreenTranslation
 
             // Add click event handler
             // Border.MouseLeftButtonDown += Border_MouseLeftButtonDown;
-            
+
             // Add context menu for right-click options
             // Border.ContextMenu = CreateContextMenu();
 
@@ -191,7 +188,7 @@ namespace ScreenTranslation
 
         // Static cache for font size calculations
         private static readonly Dictionary<string, double> _fontSizeCache = new Dictionary<string, double>();
-        
+
         // Adjust font size to fit within the container using binary search
         private void AdjustFontSize(Border border, TextBlock textBlock)
         {
@@ -205,7 +202,7 @@ namespace ScreenTranslation
                     textBlock.LayoutTransform = Transform.Identity;
                     return;
                 }
-                
+
                 // Exit early if dimensions aren't set or text is empty
                 if (Width <= 0 || Height <= 0 || string.IsNullOrWhiteSpace(textBlock.Text))
                 {
@@ -218,11 +215,11 @@ namespace ScreenTranslation
                 // // Basic text settings
                 // textBlock.TextWrapping = TextWrapping.Wrap;
                 // textBlock.TextAlignment = TextAlignment.Left;
-                
+
                 // Create a cache key based on text length, width and height
                 // Using length instead of full text to increase cache hits for similar-sized texts
                 string cacheKey = $"{textBlock.Text.Length}_{Width}_{Height}";
-                
+
                 // Check if we have a cached font size for similar dimensions
                 if (_fontSizeCache.TryGetValue(cacheKey, out double cachedFontSize))
                 {
@@ -237,7 +234,7 @@ namespace ScreenTranslation
                 {
                     scaleFactor = 1;
                 }
-                
+
                 // Binary search for the best font size
                 double minSize = 12 * scaleFactor;
                 double maxSize = 68 * scaleFactor; // Increased from 36 to 48 to allow for larger text
@@ -255,7 +252,7 @@ namespace ScreenTranslation
                     // Determine if we need more height for wrapped text
                     double minRequiredHeight = Height;
                     needsMoreHeight = false;
-                    
+
                     // If text is using most of the width, it's probably wrapping
                     if (textBlock.DesiredSize.Width >= Width * 0.9)
                     {
@@ -318,7 +315,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"Fontsize change:-------------------- {finalSize}");
                 textBlock.FontSize = finalSize;
                 textBlock.LayoutTransform = Transform.Identity;
-                
+
                 // Cache the result for future use
                 if (_fontSizeCache.Count > 100) // Limit cache size
                 {
@@ -368,56 +365,57 @@ namespace ScreenTranslation
         }
 
         // Store original background color for each border to ensure we restore properly
-        private static readonly ConditionalWeakTable<Border, SolidColorBrush> _originalBackgrounds = 
+        private static readonly ConditionalWeakTable<Border, SolidColorBrush> _originalBackgrounds =
             new ConditionalWeakTable<Border, SolidColorBrush>();
-            
+
         // Create the context menu with Copy Source, Copy Translated, Speak Source, and Learn Source options
         private ContextMenu CreateContextMenu()
         {
             ContextMenu contextMenu = new ContextMenu();
-            
+
             // Copy Source menu item
             MenuItem copySourceMenuItem = new MenuItem();
             copySourceMenuItem.Header = "Copy Source";
             copySourceMenuItem.Click += CopySourceMenuItem_Click;
             contextMenu.Items.Add(copySourceMenuItem);
-            
+
             // Copy Translated menu item
             MenuItem copyTranslatedMenuItem = new MenuItem();
             copyTranslatedMenuItem.Header = "Copy Translated";
             copyTranslatedMenuItem.Click += CopyTranslatedMenuItem_Click;
             contextMenu.Items.Add(copyTranslatedMenuItem);
-            
+
             // Add a separator
             contextMenu.Items.Add(new Separator());
-            
+
             // Learn Source menu item
             MenuItem learnSourceMenuItem = new MenuItem();
             learnSourceMenuItem.Header = "Learn Source";
             learnSourceMenuItem.Click += LearnSourceMenuItem_Click;
             contextMenu.Items.Add(learnSourceMenuItem);
-            
+
             // Speak Source menu item
             MenuItem speakSourceMenuItem = new MenuItem();
             speakSourceMenuItem.Header = "Speak Source";
             speakSourceMenuItem.Click += SpeakSourceMenuItem_Click;
             contextMenu.Items.Add(speakSourceMenuItem);
-            
+
             // Update menu item states when context menu is opened
-            contextMenu.Opened += (s, e) => {
+            contextMenu.Opened += (s, e) =>
+            {
                 copyTranslatedMenuItem.IsEnabled = !string.IsNullOrEmpty(this.TextTranslated);
             };
-            
+
             return contextMenu;
         }
-        
+
         // Click handler for Copy Source menu item
         private void CopySourceMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Clipboard.SetText(this.Text);
             PlayClickSound();
         }
-        
+
         // Click handler for Copy Translated menu item
         private void CopyTranslatedMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -427,7 +425,7 @@ namespace ScreenTranslation
                 PlayClickSound();
             }
         }
-        
+
         // Click handler for Learn Source menu item
         private void LearnSourceMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -439,27 +437,27 @@ namespace ScreenTranslation
                     string chatGptPrompt = $"Create a lesson to help me learn about this text and its translation: {this.Text}";
                     string encodedPrompt = System.Web.HttpUtility.UrlEncode(chatGptPrompt);
                     string chatGptUrl = $"https://chat.openai.com/?q={encodedPrompt}";
-                    
+
                     // Open in default browser
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = chatGptUrl,
                         UseShellExecute = true
                     });
-                    
-                    Console.WriteLine($"Opening ChatGPT with text: {this.Text.Substring(0, Math.Min(50, this.Text.Length))}...");
+
+                    System.Diagnostics.Debug.WriteLine($"Opening ChatGPT with text: {this.Text.Substring(0, Math.Min(50, this.Text.Length))}...");
                 }
                 else
                 {
-                    Console.WriteLine("No text available for Learn function");
+                    System.Diagnostics.Debug.WriteLine("No text available for Learn function");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in Learn function: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error in Learn function: {ex.Message}");
             }
         }
-        
+
         // Click handler for Speak Source menu item
         private async void SpeakSourceMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -468,17 +466,17 @@ namespace ScreenTranslation
                 if (!string.IsNullOrEmpty(this.Text))
                 {
                     string text = this.Text.Trim();
-                    Console.WriteLine($"Speak function called with text: {text.Substring(0, Math.Min(50, text.Length))}...");
-                    
+                    System.Diagnostics.Debug.WriteLine($"Speak function called with text: {text.Substring(0, Math.Min(50, text.Length))}...");
+
                     // Check if TTS is enabled in config
                     if (ConfigManager.Instance.IsTtsEnabled())
                     {
                         string ttsService = ConfigManager.Instance.GetTtsService();
-                        
+
                         try
                         {
                             bool success = await WindowsTTSService.Instance.SpeakText(text);
-                            
+
                             if (!success)
                             {
                                 System.Windows.MessageBox.Show("Failed to generate speech using Windows TTS. Please check your settings.",
@@ -487,8 +485,8 @@ namespace ScreenTranslation
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"TTS error: {ex.Message}");
-                            System.Windows.MessageBox.Show($"Text-to-Speech error: {ex.Message}", 
+                            System.Diagnostics.Debug.WriteLine($"TTS error: {ex.Message}");
+                            System.Windows.MessageBox.Show($"Text-to-Speech error: {ex.Message}",
                                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                     }
@@ -508,11 +506,11 @@ namespace ScreenTranslation
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in Speak function: {ex.Message}");
-                System.Windows.MessageBox.Show($"Error: {ex.Message}", "Text-to-Speech Error", 
+                System.Windows.MessageBox.Show($"Error: {ex.Message}", "Text-to-Speech Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
         // Animate the border when clicked
         private void AnimateBorderOnClick(Border border)
         {
@@ -533,7 +531,7 @@ namespace ScreenTranslation
 
                 // Get the color to return to (use stored value, not current which might be mid-animation)
                 Color targetColor = originalBrush?.Color ?? ((SolidColorBrush)border.Background).Color;
-                
+
                 // Create a new transform for this animation
                 var scaleTransform = new ScaleTransform(1.0, 1.0);
                 border.RenderTransform = scaleTransform;
@@ -560,9 +558,9 @@ namespace ScreenTranslation
 
                 // Create a new brush for the animation
                 SolidColorBrush animationBrush = new SolidColorBrush(Colors.Yellow);
-                
+
                 // When the color animation completes, reset to original background
-                colorAnimation.Completed += (s, e) => 
+                colorAnimation.Completed += (s, e) =>
                 {
                     border.Background = originalBrush?.Clone() ?? new SolidColorBrush(targetColor);
                 };

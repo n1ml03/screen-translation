@@ -1,21 +1,19 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows.Interop;
-using System.Drawing.Imaging;
-using Color = System.Windows.Media.Color;
-using System.Windows.Threading;
-using System.Drawing.Drawing2D;
-using System.Diagnostics;
-using System.Text;
+using System.Windows.Media;
 using System.Windows.Shell;
-using System.Net.Http;
-using System.Text.Json;
-using SocketIOClient;
-using Windows.ApplicationModel.VoiceCommands;
+using System.Windows.Threading;
+using Color = System.Windows.Media.Color;
 
 
 namespace ScreenTranslation
@@ -43,13 +41,13 @@ namespace ScreenTranslation
 
         [DllImport("user32.dll")]
         private static extern bool ClientToScreen(IntPtr hWnd, ref System.Drawing.Point lpPoint);
-        
+
         [DllImport("user32.dll")]
         private static extern int ShowCursor(bool bShow);
-        
+
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetConsoleWindow();
-        
+
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
@@ -67,7 +65,7 @@ namespace ScreenTranslation
         private const uint SC_CLOSE = 0xF060;
         private const uint MF_BYCOMMAND = 0x00000000;
         private const uint MF_GRAYED = 0x00000001;
-        
+
         private static readonly HttpClient _httpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
 
 
@@ -109,69 +107,69 @@ namespace ScreenTranslation
         // Store previous capture position to calculate offset
         private int previousCaptureX;
         private int previousCaptureY;
-        
+
         // Auto translation
         private bool isAutoTranslateEnabled = true;
-        
+
         // ChatBox management
         private ChatBoxWindow? chatBoxWindow;
         private bool isChatBoxVisible = false;
         private bool isSelectingChatBoxArea = false;
         private bool _chatBoxEventsAttached = false;
-        
+
         // Keep translation history even when ChatBox is closed
         private Queue<TranslationEntry> _translationHistory = new Queue<TranslationEntry>();
-        
+
         // Accessor for ChatBoxWindow to get the translation history
         public Queue<TranslationEntry> GetTranslationHistory()
         {
             return _translationHistory;
         }
-        
+
         // Method to clear translation history
         public void ClearTranslationHistory()
         {
             _translationHistory.Clear();
-            Console.WriteLine("Translation history cleared from MainWindow");
+            System.Diagnostics.Debug.WriteLine("Translation history cleared from MainWindow");
         }
-       
-  
-        //allow this to be accesible through an "Instance" variable
+
+
+        // Allow this to be accessible through an "Instance" variable
         public static MainWindow Instance { get { return _this!; } }
         // Socket connection status
         private TextBlock? socketStatusText;
-        
+
         // Console visibility management
         private bool isConsoleVisible = false;
         private IntPtr consoleWindow;
 
         static MainWindow? _this = null;
-     
+
         [DllImport("kernel32.dll")]
         public static extern bool AllocConsole();
-        
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool SetConsoleOutputCP(uint wCodePageID);
-        
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool SetConsoleCP(uint wCodePageID);
-        
+
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern bool SetCurrentConsoleFontEx(IntPtr hConsoleOutput, bool bMaximumWindow, ref CONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
-        
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr GetStdHandle(int nStdHandle);
-        
+
         // Console mode control
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
-        
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
-        
+
         // Standard input handle constant
         public const int STD_INPUT_HANDLE = -10;
-        
+
         // Console input mode flags
         public const uint ENABLE_ECHO_INPUT = 0x0004;
         public const uint ENABLE_LINE_INPUT = 0x0002;
@@ -182,11 +180,11 @@ namespace ScreenTranslation
         public const uint ENABLE_QUICK_EDIT_MODE = 0x0040;
         public const uint ENABLE_EXTENDED_FLAGS = 0x0080;
         public const uint ENABLE_AUTO_POSITION = 0x0100;
-        
+
         // Keyboard hooks are now managed in KeyboardShortcuts.cs
-        
+
         // We'll use a different approach that doesn't rely on SetConsoleCtrlHandler
-        
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         public struct CONSOLE_FONT_INFOEX
         {
@@ -198,7 +196,7 @@ namespace ScreenTranslation
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
             public string FaceName;
         }
-        
+
         [StructLayout(LayoutKind.Sequential)]
         public struct COORD
         {
@@ -207,18 +205,18 @@ namespace ScreenTranslation
         }
 
         public const int STD_OUTPUT_HANDLE = -11;
-        public bool GetIsStarted() { return isStarted; }    
+        public bool GetIsStarted() { return isStarted; }
         public bool GetTranslateEnabled() { return isAutoTranslateEnabled; }
-        
+
         // Methods for syncing UI controls with MonitorWindow
         // Flag to prevent saving during initialization
         private static bool _isInitializing = true;
-        
-        
+
+
         public void SetOcrMethod(string method)
         {
             Console.WriteLine($"MainWindow.SetOcrMethod called with method: {method} (isInitializing: {_isInitializing})");
-            
+
             // Only update the MainWindow's internal state during initialization
             // Don't update other windows or save to config
             if (_isInitializing)
@@ -226,28 +224,24 @@ namespace ScreenTranslation
                 Console.WriteLine($"Setting OCR method during initialization: {method}");
                 selectedOcrMethod = method;
                 // Important: Update status text even during initialization
-                if (method == "Windows OCR")
+                if (method == "OneOCR")
                 {
                     SetStatus($"Using {method} (built-in)");
                 }
-                else if (method == "EasyOCR")
-                {
-                    SetStatus("Please start EasyOCR server");
-                }
                 else
                 {
-                    SetStatus("Please start PaddleOCR server");
+                    SetStatus($"Please start {method} server");
                 }
                 return;
             }
-            
+
             // Only process if actually changing the method
             if (selectedOcrMethod != method)
             {
                 Console.WriteLine($"MainWindow changing OCR method from {selectedOcrMethod} to {method}");
                 selectedOcrMethod = method;
                 // No need to handle socket connection here, the MonitorWindow handles that
-                if (method == "Windows OCR")
+                if (method == "OneOCR")
                 {
                     if (isStarted)
                     {
@@ -268,57 +262,26 @@ namespace ScreenTranslation
                     SetStatus($"Please click StartServer button to reconnect server");
 
 
-                    // // Ensure we're connected when switching to new OCR
-                    // if (!SocketManager.Instance.IsConnected)
-                    // {
-                    //     Console.WriteLine($"Socket not connected when switching to {method}");
-                    //     _ = Task.Run(async () =>
-                    //     {
-                    //         try
-                    //         {
-                    //             bool reconnected = await SocketManager.Instance.TryReconnectAsync();
-
-                    //             if (!reconnected || !SocketManager.Instance.IsConnected)
-                    //             {
-                    //                 // Only show an error message if explicitly requested by user action
-                    //                 Console.WriteLine("Failed to connect to socket server - EasyOCR will not be available");
-                    //             }
-
-
-                    //         }
-                    //         catch (Exception ex)
-                    //         {
-                    //             Console.WriteLine($"Error reconnecting: {ex.Message}");
-
-                    //             // Show an error message
-                    //             System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    //             {
-                    //                 System.Windows.MessageBox.Show($"Socket connection error: {ex.Message}",
-                    //                     "Connection Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                    //             });
-                    //         }
-                    //     });
-                    // }
                 }
             }
         }
-        
+
         public void SetAutoTranslateEnabled(bool enabled)
         {
             if (isAutoTranslateEnabled != enabled)
             {
                 isAutoTranslateEnabled = enabled;
-                
+
                 // Save to config
                 ConfigManager.Instance.SetAutoTranslateEnabled(enabled);
-                
+
                 // Clear text objects
                 Logic.Instance.ClearAllTextObjects();
                 Logic.Instance.ResetHash();
-                
+
                 // Force OCR to run again
                 SetOCRCheckIsWanted(true);
-                
+
                 MonitorWindow.Instance.RefreshOverlays();
             }
         }
@@ -388,7 +351,7 @@ namespace ScreenTranslation
         {
             ToggleTranslationAreaSelector();
         }
-        
+
         private void ToggleTranslationAreaSelector()
         {
             if (this.WindowState != WindowState.Minimized)
@@ -400,7 +363,7 @@ namespace ScreenTranslation
                 // Cancel translation region selection if active
                 isSelectingTranslationArea = false;
                 selectAreaButton.Background = BlueBrush;
-              
+
                 // Find and close the region selection window if currently open
                 foreach (Window window in System.Windows.Application.Current.Windows)
                 {
@@ -417,11 +380,11 @@ namespace ScreenTranslation
                 MonitorWindow.Instance.RefreshOverlays();
                 Logic.Instance.ClearAllTextObjects();
             }
-            
+
             // Show translation region picker window
             TranslationAreaSelectorWindow selectorWindow = TranslationAreaSelectorWindow.GetInstance();
             selectorWindow.SelectionComplete += TranslationAreaSelector_SelectionComplete;
-            selectorWindow.Closed += (s, e) => 
+            selectorWindow.Closed += (s, e) =>
             {
                 isSelectingTranslationArea = false;
                 if (!hasSelectedTranslationArea)
@@ -440,13 +403,13 @@ namespace ScreenTranslation
         {
             // Check if multiple areas are allowed
             bool allowMultipleAreas = ConfigManager.Instance.IsMultiSelectionAreaEnabled();
-            
+
             if (allowMultipleAreas)
             {
-                
+
                 if (savedTranslationAreas == null)
                     savedTranslationAreas = new List<Rect>();
-                    
+
                 // Add new selection area to the list
                 savedTranslationAreas.Add(selectionRect);
 
@@ -464,26 +427,26 @@ namespace ScreenTranslation
                 // Save lastest selection area if multiple areas are not allowed
                 savedTranslationAreas = new List<Rect> { selectionRect };
             }
-            
+
             // Default using lastest selection area
             currentAreaIndex = savedTranslationAreas.Count - 1;
-            
+
             // Current selection area
             Rect currentRect = savedTranslationAreas[currentAreaIndex];
-            
+
             // Save current selection area
             selectedTranslationArea = currentRect;
             hasSelectedTranslationArea = true;
-            
+
             Console.WriteLine($"The translation area has been selected: X={currentRect.X}, Y={currentRect.Y}, Width={currentRect.Width}, Height={currentRect.Height}");
             Console.WriteLine($"Total saved areas: {savedTranslationAreas.Count}, Current index: {currentAreaIndex + 1}");
-            
+
             // Update capture for new selection area
             UpdateCustomCaptureRect();
-            
+
             selectAreaButton.Background = GreenBrush;
         }
-        
+
         public void SwitchToTranslationArea(int index)
         {
             if (savedTranslationAreas.Count == 0)
@@ -496,28 +459,28 @@ namespace ScreenTranslation
                 Logic.Instance.ClearAllTextObjects();
                 MonitorWindow.Instance.RefreshOverlays();
             }
-            
+
             // Ensure valid index
             if (index < 0 || index >= savedTranslationAreas.Count)
             {
-                Console.WriteLine($"Invalid area index: {index+1}. Available areas: {savedTranslationAreas.Count}");
+                Console.WriteLine($"Invalid area index: {index + 1}. Available areas: {savedTranslationAreas.Count}");
                 return;
             }
-            
+
             // Update current index
             currentAreaIndex = index;
-            
+
             Rect selectedRect = savedTranslationAreas[currentAreaIndex];
-            
+
             // Update select area
             selectedTranslationArea = selectedRect;
             hasSelectedTranslationArea = true;
-            
+
             Console.WriteLine($"Switched to translation area {currentAreaIndex + 1}: X={selectedRect.X}, Y={selectedRect.Y}, Width={selectedRect.Width}, Height={selectedRect.Height}");
-            
+
             // Update capture area for new selection area
             UpdateCustomCaptureRect();
-            
+
             // Show notification for user
             ShowAreaSwitchNotification(currentAreaIndex + 1);
         }
@@ -535,7 +498,7 @@ namespace ScreenTranslation
                 Placement = System.Windows.Controls.Primitives.PlacementMode.Absolute,
                 PlacementTarget = this
             };
-            
+
             // Content notification
             var border = new Border
             {
@@ -543,7 +506,7 @@ namespace ScreenTranslation
                 CornerRadius = new CornerRadius(5),
                 Padding = new Thickness(10)
             };
-            
+
             var text = new TextBlock
             {
                 Text = $"Switched to Selection Area {areaNumber}",
@@ -552,14 +515,14 @@ namespace ScreenTranslation
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 VerticalAlignment = System.Windows.VerticalAlignment.Center
             };
-            
+
             border.Child = text;
             notification.Child = border;
-            
+
             // Set position to selected area
             notification.HorizontalOffset = selectedTranslationArea.X + (selectedTranslationArea.Width / 2) - (notification.Width / 2);
             notification.VerticalOffset = selectedTranslationArea.Y + (selectedTranslationArea.Height / 2) - (notification.Height / 2);
-            
+
             // Auto close notification after 1.5 second
             var timer = new System.Windows.Threading.DispatcherTimer
             {
@@ -572,7 +535,7 @@ namespace ScreenTranslation
                 timer.Stop();
                 SetOCRCheckIsWanted(true);
             };
-            
+
             timer.Start();
         }
 
@@ -599,26 +562,26 @@ namespace ScreenTranslation
         private void UpdateMonitorWindowToSelectedArea()
         {
             if (!hasSelectedTranslationArea) return;
-            
+
             // Place the MonitorWindow exactly at the position of the selected area
             MonitorWindow.Instance.Left = selectedTranslationArea.X;
             MonitorWindow.Instance.Top = selectedTranslationArea.Y;
-            
+
             // Set the size of the MonitorWindow to match the size of the selected area
             MonitorWindow.Instance.Width = selectedTranslationArea.Width;
             MonitorWindow.Instance.Height = selectedTranslationArea.Height;
-            
+
             // Save the new position for future display
             monitorWindowLeft = selectedTranslationArea.X;
             monitorWindowTop = selectedTranslationArea.Y;
-            
+
             // Show the MonitorWindow if it is not already displayed
             if (!MonitorWindow.Instance.IsVisible)
             {
                 MonitorWindow.Instance.Show();
                 monitorButton.Background = RedBrush;
             }
-            
+
             Console.WriteLine($"The position of the MonitorWindow has been updated according to the selected area.: ({selectedTranslationArea.X}, {selectedTranslationArea.Y}, {selectedTranslationArea.Width}, {selectedTranslationArea.Height})");
         }
 
@@ -666,7 +629,7 @@ namespace ScreenTranslation
             UpdateCaptureRect();
 
             // Update app version on setup screen
-            AppVersion.Text = "Version 2.5";
+            AppVersion.Text = "Version 1.0";
 
             // Add socket status to the header
             if (FooterBorder != null && FooterBorder.Child is Grid footerGrid)
@@ -735,6 +698,9 @@ namespace ScreenTranslation
             // Load auto-translate setting from config
             isAutoTranslateEnabled = ConfigManager.Instance.IsAutoTranslateEnabled();
 
+            // Update hotkey display with current configuration
+            UpdateHotkeyDisplay();
+
             // Register the LocationChanged event to update the position of the MonitorWindow when the MainWindow moves
             this.LocationChanged += MainWindow_LocationChanged;
             // ToggleMonitorWindow();
@@ -746,14 +712,47 @@ namespace ScreenTranslation
         {
             UpdateCaptureRect();
         }
-        
+
         // Handler for application-level keyboard shortcuts
         private void Application_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             // Forward to the central keyboard shortcuts handler
             KeyboardShortcuts.HandleKeyDown(e);
         }
-       
+
+        // Update hotkey display with current configuration
+        private void UpdateHotkeyDisplay()
+        {
+            try
+            {
+                // Main Controls
+                hotKeyStartStop.Text = ConfigManager.Instance.GetHotKey("Start/Stop");
+                hotKeyOverlay.Text = ConfigManager.Instance.GetHotKey("Overlay");
+                hotKeySetting.Text = ConfigManager.Instance.GetHotKey("Setting");
+                hotKeyLog.Text = ConfigManager.Instance.GetHotKey("Log");
+                hotKeyChatBox.Text = ConfigManager.Instance.GetHotKey("ChatBox");
+
+                // Area Management
+                hotKeySelectArea.Text = ConfigManager.Instance.GetHotKey("Select Area");
+                hotKeyShowArea.Text = ConfigManager.Instance.GetHotKey("Show Area");
+
+                // Area Clearing
+                hotKeyClearAreas.Text = ConfigManager.Instance.GetHotKey("Clear Areas");
+                hotKeyClearPreviousArea.Text = ConfigManager.Instance.GetHotKey("Clear Selected Area");
+
+                // Quick Area Selection
+                hotKeyArea1.Text = ConfigManager.Instance.GetHotKey("Area 1");
+                hotKeyArea2.Text = ConfigManager.Instance.GetHotKey("Area 2");
+                hotKeyArea3.Text = ConfigManager.Instance.GetHotKey("Area 3");
+                hotKeyArea4.Text = ConfigManager.Instance.GetHotKey("Area 4");
+                hotKeyArea5.Text = ConfigManager.Instance.GetHotKey("Area 5");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating hotkey display: {ex.Message}");
+            }
+        }
+
         private void TestConfigLoading()
         {
             try
@@ -768,7 +767,7 @@ namespace ScreenTranslation
 
                 // Construct full endpoint like the translation service does
                 string fullEndpoint = string.IsNullOrEmpty(baseEndpoint) ? "Not set" :
-                    $"{baseEndpoint.TrimEnd('/')}/v1/{model}";
+                    $"{baseEndpoint.TrimEnd('/')}/chatbot/api/{model}";
 
                 Console.WriteLine("=== Configuration Test ===");
                 Console.WriteLine($"Username: {(string.IsNullOrEmpty(username) ? "Not set" : username)}");
@@ -778,13 +777,13 @@ namespace ScreenTranslation
                 Console.WriteLine($"LLM Prompt: {(string.IsNullOrEmpty(llmPrompt) ? "Not set" : "Set - " + llmPrompt.Length + " chars")}");
                 Console.WriteLine($"OCR Method: {ocrMethod}");
                 Console.WriteLine($"Translation Service: {translationService}");
-                
+
                 if (!string.IsNullOrEmpty(llmPrompt))
                 {
                     Console.WriteLine("First 100 characters of LLM Prompt:");
                     Console.WriteLine(llmPrompt.Length > 100 ? llmPrompt.Substring(0, 100) + "..." : llmPrompt);
                 }
-                
+
                 Console.WriteLine("=========================");
             }
             catch (Exception ex)
@@ -792,7 +791,7 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error testing config: {ex.Message}");
             }
         }
-        
+
         // Update MonitorWindow position
         private void UpdateMonitorWindowPosition()
         {
@@ -870,21 +869,21 @@ namespace ScreenTranslation
                     (windowRect.Right - windowRect.Left) - leftBorderThickness - rightBorderThickness,
                     (windowRect.Bottom - windowRect.Top) - customTitleBarHeight - customFooterHeight - bottomBorderThickness);
             }
-            
+
             // If position changed and we have text objects, update their positions
-            if ((previousCaptureX != captureRect.Left || previousCaptureY != captureRect.Top) && 
+            if ((previousCaptureX != captureRect.Left || previousCaptureY != captureRect.Top) &&
                 Logic.Instance.TextObjects.Count > 0)
             {
                 // Calculate the offset
                 int offsetX = captureRect.Left - previousCaptureX;
                 int offsetY = captureRect.Top - previousCaptureY;
-                
+
                 // Apply offset to text objects
                 Logic.Instance.UpdateTextObjectPositions(offsetX, offsetY);
-                
+
                 Console.WriteLine($"Capture position changed by ({offsetX}, {offsetY}). Text overlays updated.");
             }
-            
+
 
             UpdateMonitorWindowPosition();
         }
@@ -893,7 +892,7 @@ namespace ScreenTranslation
 
         private void OnUpdateTick(object? sender, EventArgs e)
         {
-          
+
             PerformCapture();
         }
 
@@ -913,15 +912,15 @@ namespace ScreenTranslation
             System.Windows.Controls.Button btn = (System.Windows.Controls.Button)sender;
             String method = ConfigManager.Instance.GetOcrMethod();
             bool isReady = false;
-            
-            if (method == "Windows OCR")
+
+            if (method == "OneOCR")
             {
-                // Windows OCR always ready because it don't need server
+                // OneOCR always ready because it don't need server
                 isReady = true;
             }
-            else 
+            else
             {
-                // EasyOCR and PaddleOCR need connect to server
+                // PaddleOCR and OneOCR need connect to server
                 isReady = socketStatusText != null &&
                         (socketStatusText.Text == $"Successfully connected to {method} server");
             }
@@ -931,7 +930,7 @@ namespace ScreenTranslation
                 Logic.Instance.ResetHash();
                 isStarted = false;
                 btn.Content = "Start";
-                btn.Background = GreenBrush;                                                   
+                btn.Background = GreenBrush;
                 Logic.Instance.ClearAllTextObjects();
                 MonitorWindow.Instance.RefreshOverlays();
                 MonitorWindow.Instance.HideTranslationStatus();
@@ -960,15 +959,15 @@ namespace ScreenTranslation
             }
         }
 
-        
+
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
         }
-        
+
         // Button to show the window when it's hidden
         private System.Windows.Controls.Button? showButton;
-        
+
         private void HideButton_Click(object sender, RoutedEventArgs e)
         {
             // Hide the main window elements
@@ -1022,12 +1021,12 @@ namespace ScreenTranslation
                 showButton.Visibility = Visibility.Visible;
             }
         }
-        
+
         private void ShowButton_Click(object sender, RoutedEventArgs e)
         {
             // Show the main window elements
             MainBorder.Visibility = Visibility.Visible;
-            
+
             // Hide the show button
             if (showButton != null)
             {
@@ -1038,11 +1037,11 @@ namespace ScreenTranslation
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            
+
             // Get the handle of the main window
             IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             KeyboardShortcuts.SetMainWindowHandle(handle);
-            
+
 
             HwndSource source = HwndSource.FromHwnd(handle);
             source.AddHook(WndProc);
@@ -1054,7 +1053,7 @@ namespace ScreenTranslation
             {
                 handled = KeyboardShortcuts.ProcessHotKey(wParam);
             }
-            
+
             return IntPtr.Zero;
         }
 
@@ -1065,7 +1064,7 @@ namespace ScreenTranslation
 
             // Clean up MouseManager resources
             MouseManager.Instance.Cleanup();
-            
+
             Logic.Instance.Finish();
             OcrServerManager.Instance.StopOcrServer();
             OcrServerManager.Instance.KillProcessesByPort(9191);
@@ -1081,17 +1080,17 @@ namespace ScreenTranslation
 
             base.OnClosed(e);
         }
-        
+
         // Settings button toggle handler
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             ToggleSettingsWindow();
         }
-        
+
         // Remember the settings window position
         private double settingsWindowLeft = -1;
         private double settingsWindowTop = -1;
-        
+
         // Show/hide the settings window
         private void ToggleSettingsWindow()
         {
@@ -1101,9 +1100,9 @@ namespace ScreenTranslation
                 // Store current position before hiding
                 settingsWindowLeft = SettingsWindow.Instance.Left;
                 settingsWindowTop = SettingsWindow.Instance.Top;
-                
+
                 Console.WriteLine($"Saving settings position: {settingsWindowLeft}, {settingsWindowTop}");
-                
+
                 SettingsWindow.Instance.Hide();
                 Console.WriteLine("Settings window hidden");
                 settingsButton.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(108, 117, 125));
@@ -1129,7 +1128,7 @@ namespace ScreenTranslation
                     SettingsWindow.Instance.Top = mainTop;
                     Console.WriteLine("No saved position, positioning settings window to the right");
                 }
-                
+
                 SettingsWindow.Instance.Show();
                 Console.WriteLine($"Settings window shown at position {SettingsWindow.Instance.Left}, {SettingsWindow.Instance.Top}");
                 settingsButton.Background = OrangeBrush;
@@ -1159,7 +1158,7 @@ namespace ScreenTranslation
                     g.SmoothingMode = SmoothingMode.HighSpeed;
                     g.InterpolationMode = InterpolationMode.Low;
                     g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
-                   
+
                     try
                     {
                         g.CopyFromScreen(
@@ -1168,16 +1167,15 @@ namespace ScreenTranslation
                             0, 0,
                             bitmap.Size,
                             CopyPixelOperation.SourceCopy);
-                      
+
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error during screen capture: {ex.Message}");
-                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                        Console.WriteLine($"[CAPTURE ERROR] {ex.Message}");
                     }
-                      
+
                 }
-                
+
                 // Store the current capture coordinates for use with OCR results
                 Logic.Instance.SetCurrentCapturePosition(captureRect.Left, captureRect.Top);
 
@@ -1195,7 +1193,7 @@ namespace ScreenTranslation
                     }
 
                     //do we actually want to do OCR right now?  
-                        if (!GetIsStarted()) return;
+                    if (!GetIsStarted()) return;
 
                     if (!GetOCRCheckIsWanted())
                     {
@@ -1207,24 +1205,22 @@ namespace ScreenTranslation
 
                     SetOCRCheckIsWanted(false);
 
-                    // Check if we're using Windows OCR - if so, process in memory without saving
-                    if (GetSelectedOcrMethod() == "Windows OCR")
+                    // Check if we're using OneOCR
+                    if (GetSelectedOcrMethod() == "OneOCR")
                     {
                         string sourceLanguage = (sourceLanguageComboBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()!;
-                        Logic.Instance.ProcessWithWindowsOCR(bitmap, sourceLanguage);
-                    }
-                    else if (GetSelectedOcrMethod() != "Windows OCR" & ConfigManager.Instance.IsWindowsOCRIntegrationEnabled())
-                    {
-                        string sourceLanguage = (sourceLanguageComboBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()!;
-                        //write saving bitmap to log
-                        Console.WriteLine($"Saving bitmap to {outputPath}");
+                        // Save bitmap to file for OneOCR processing
                         bitmap.Save(outputPath, ImageFormat.Png);
-                        Logic.Instance.ProcessWithWindowsOCRIntegration(bitmap, sourceLanguage, outputPath);
+                        Logic.Instance.ProcessWithOneOCR(outputPath, sourceLanguage);
+                    }
+                    else if (GetSelectedOcrMethod() != "OneOCR" & ConfigManager.Instance.IsOneOCRIntegrationEnabled())
+                    {
+                        string sourceLanguage = (sourceLanguageComboBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()!;
+                        bitmap.Save(outputPath, ImageFormat.Png);
+                        Logic.Instance.ProcessWithOneOCRIntegration(bitmap, sourceLanguage, outputPath);
                     }
                     else
                     {
-                        //write saving bitmap to log
-                        Console.WriteLine($"Saving bitmap to {outputPath}");
                         bitmap.Save(outputPath, ImageFormat.Png);
                         Logic.Instance.SendImageToServerOCR(outputPath);
                     }
@@ -1234,19 +1230,18 @@ namespace ScreenTranslation
                 catch (Exception ex)
                 {
                     // Handle potential file lock or other errors
-                    Console.WriteLine($"Error processing screenshot: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    Console.WriteLine($"[CAPTURE ERROR] Failed to process screenshot: {ex.Message}");
                     Thread.Sleep(100);
                 }
             }
 
         }
-        
+
         private void MinimizeButton_Click(object sender, RoutedEventArgs e)
         {
             this.WindowState = WindowState.Minimized;
         }
-        
+
         private void AutoTranslateCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
         {
             // Convert sender to CheckBox
@@ -1263,8 +1258,8 @@ namespace ScreenTranslation
                 MonitorWindow.Instance.RefreshOverlays();
             }
         }
-        
-   
+
+
         // Reset OCR hash when language selection changes
         private void SourceLanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1273,16 +1268,16 @@ namespace ScreenTranslation
             {
                 return;
             }
-            
+
             if (sender is System.Windows.Controls.ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
             {
                 string language = selectedItem.Content.ToString() ?? "ja";
                 Console.WriteLine($"Source language changed to: {language}");
-                
+
                 // Save to config
                 ConfigManager.Instance.SetSourceLanguage(language);
             }
-            
+
             // Reset the OCR hash to force a fresh comparison after changing source language
             Logic.Instance.ClearAllTextObjects();
         }
@@ -1294,16 +1289,16 @@ namespace ScreenTranslation
             {
                 return;
             }
-            
+
             if (sender is System.Windows.Controls.ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
             {
                 string language = selectedItem.Content.ToString() ?? "en";
                 Console.WriteLine($"Target language changed to: {language}");
-                
+
                 // Save to config
                 ConfigManager.Instance.SetTargetLanguage(language);
             }
-            
+
             // Reset the OCR hash to force a fresh comparison after changing target language
             Logic.Instance.ClearAllTextObjects();
         }
@@ -1313,14 +1308,14 @@ namespace ScreenTranslation
             if (sender is System.Windows.Controls.ComboBox comboBox)
             {
                 string? ocrMethod = (comboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString();
-                
+
                 if (!string.IsNullOrEmpty(ocrMethod))
                 {
                     // Reset the OCR hash to force a fresh comparison after changing OCR method
                     Logic.Instance.ResetHash();
-                    
+
                     Console.WriteLine($"OCR method changed to: {ocrMethod}");
-                    
+
                     // Clear any existing text objects
                     Logic.Instance.ClearAllTextObjects();
 
@@ -1328,14 +1323,14 @@ namespace ScreenTranslation
                     OcrServerManager.Instance.StopOcrServer();
                     SocketManager.Instance.Disconnect();
                     // Update the UI and connection state based on the selected OCR method
-                    if (ocrMethod == "Windows OCR")
+                    if (ocrMethod == "OneOCR")
                     {
-                        // Using Windows OCR, no need for socket connection
+                        // Using OneOCR, no need for socket connection
                         SetStatus($"Using {ocrMethod} (built-in)");
                     }
                     else
                     {
-                        // Using EasyOCR or PaddleOCR, try to connect to the socket server
+                        // Using PaddleOCR or OneOCR, try to connect to the socket server
                         SetStatus($"Connecting to Server {ocrMethod}.");
 
                         _ = OcrServerManager.Instance.StartOcrServerAsync(ocrMethod);
@@ -1364,28 +1359,28 @@ namespace ScreenTranslation
                 }
             }
         }
-        
+
         // Keep track of selected OCR method
-        private string selectedOcrMethod = "Windows OCR";
-        
+        private string selectedOcrMethod = "OneOCR";
+
         public string GetSelectedOcrMethod()
         {
             return selectedOcrMethod;
         }
-       
+
         // Toggle the monitor window
         private void MonitorButton_Click(object sender, RoutedEventArgs e)
         {
 
-            ToggleMonitorWindow();   
+            ToggleMonitorWindow();
         }
-        
+
         // Handler for the Log button click
         private void LogButton_Click(object sender, RoutedEventArgs e)
         {
             ToggleConsoleWindow();
         }
-        
+
         // Toggle console window visibility
         private void ToggleConsoleWindow()
         {
@@ -1424,7 +1419,7 @@ namespace ScreenTranslation
                 DisableConsoleInput();
             }
         }
-        
+
         // Initialize console window with proper encoding and font
         private void InitializeConsole()
         {
@@ -1443,11 +1438,11 @@ namespace ScreenTranslation
 
             // Disable console input to prevent the app from freezing
             DisableConsoleInput();
-            
+
             // Set Windows console code page to UTF-8 (65001)
             SetConsoleCP(65001);
             SetConsoleOutputCP(65001);
-            
+
             // Set up a proper font for Japanese characters
             IntPtr hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
             CONSOLE_FONT_INFOEX fontInfo = new CONSOLE_FONT_INFOEX();
@@ -1457,23 +1452,23 @@ namespace ScreenTranslation
             fontInfo.FontWeight = 400; // Normal weight
             fontInfo.dwFontSize = new COORD { X = 0, Y = 16 }; // Font size
             SetCurrentConsoleFontEx(hConsoleOutput, false, ref fontInfo);
-            
+
             // Set .NET console encoding to UTF-8
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
-            
+
             // Redirect standard output to the console with UTF-8 encoding
             StreamWriter standardOutput = new StreamWriter(Console.OpenStandardOutput(), Encoding.UTF8)
             {
                 AutoFlush = true
             };
             Console.SetOut(standardOutput);
-            
+
             // Write initial message
             Console.WriteLine("Console output initialized. Toggle visibility with the Log button.");
             Console.WriteLine("Note: Console input is disabled to prevent application freeze.");
         }
-        
+
         // Disable console input to prevent app freezing when focus is in the console
         private void DisableConsoleInput()
         {
@@ -1486,7 +1481,7 @@ namespace ScreenTranslation
                     Console.WriteLine("Error getting console input handle");
                     return;
                 }
-                
+
                 // Get current console mode
                 uint mode;
                 if (!GetConsoleMode(hStdIn, out mode))
@@ -1494,21 +1489,21 @@ namespace ScreenTranslation
                     Console.WriteLine($"Error getting console mode: {Marshal.GetLastWin32Error()}");
                     return;
                 }
-                
+
                 // Disable input modes that would cause the app to wait for input
                 // This prevents the console from freezing when it gets focus
                 // We're turning off all input processing to make the console display-only
                 uint newMode = 0; // Set to 0 to disable all input
-                
+
                 // You can selectively re-enable certain input features if needed:
                 // newMode = ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT;
-                
+
                 if (!SetConsoleMode(hStdIn, newMode))
                 {
                     Console.WriteLine($"Error setting console mode: {Marshal.GetLastWin32Error()}");
                     return;
                 }
-                
+
                 Console.WriteLine("Console input disabled successfully");
             }
             catch (Exception ex)
@@ -1516,17 +1511,17 @@ namespace ScreenTranslation
                 Console.WriteLine($"Error disabling console input: {ex.Message}");
             }
         }
-        
+
         // Position the monitor window to the right of the main window
         private void PositionMonitorWindowToTheRight()
         {
             UpdateMonitorWindowPosition();
         }
-        
+
         // Remember the monitor window position
         private double monitorWindowLeft = -1;
         private double monitorWindowTop = -1;
-        
+
         private void ToggleMonitorWindow()
         {
             if (MonitorWindow.Instance.IsVisible)
@@ -1592,8 +1587,7 @@ namespace ScreenTranslation
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"ERROR in ToggleMonitorWindow: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    Console.WriteLine($"[MONITOR ERROR] Failed to toggle window: {ex.Message}");
                 }
             }
         }
@@ -1605,20 +1599,20 @@ namespace ScreenTranslation
             {
                 ToggleMonitorWindow();
             }
-            
+
             // Toggle BorderThickness: 0 <-> 1
-            MonitorWindow.Instance.BorderThickness = 
-                (MonitorWindow.Instance.BorderThickness == new Thickness(1)) 
-                    ? new Thickness(0) 
+            MonitorWindow.Instance.BorderThickness =
+                (MonitorWindow.Instance.BorderThickness == new Thickness(1))
+                    ? new Thickness(0)
                     : new Thickness(1);
         }
-        
+
         // ChatBox Button click handler
         private void ChatBoxButton_Click(object sender, RoutedEventArgs e)
         {
             ToggleChatBox();
         }
-        
+
         // Toggle ChatBox visibility and position
         private void ToggleChatBox()
         {
@@ -1627,7 +1621,7 @@ namespace ScreenTranslation
                 // Cancel the selection mode if already selecting
                 isSelectingChatBoxArea = false;
                 chatBoxButton.Background = LightGreenBrush;
-                
+
                 // Find and close any existing selector window
                 foreach (Window window in System.Windows.Application.Current.Windows)
                 {
@@ -1639,18 +1633,18 @@ namespace ScreenTranslation
                 }
                 return;
             }
-            
+
             // ChatBoxWindow.Instance is always available, but may not be visible
             // Make sure our chatBoxWindow reference is up to date
             chatBoxWindow = ChatBoxWindow.Instance;
-            
+
             if (isChatBoxVisible && chatBoxWindow != null)
             {
                 // Hide ChatBox
                 chatBoxWindow.Hide();
                 isChatBoxVisible = false;
                 chatBoxButton.Background = LightGreenBrush;
-                
+
                 // Don't set chatBoxWindow to null here - we're just hiding it, not closing it
             }
             else
@@ -1658,7 +1652,7 @@ namespace ScreenTranslation
                 // Show selector to allow user to position ChatBox
                 ChatBoxSelectorWindow selectorWindow = ChatBoxSelectorWindow.GetInstance();
                 selectorWindow.SelectionComplete += ChatBoxSelector_SelectionComplete;
-                selectorWindow.Closed += (s, e) => 
+                selectorWindow.Closed += (s, e) =>
                 {
                     isSelectingChatBoxArea = false;
                     // Only set button to blue if the ChatBox isn't visible (was cancelled)
@@ -1668,19 +1662,19 @@ namespace ScreenTranslation
                     }
                 };
                 selectorWindow.Show();
-                
+
                 // Set button to red while selector is active
                 isSelectingChatBoxArea = true;
                 chatBoxButton.Background = new SolidColorBrush(Color.FromRgb(176, 69, 69)); // Red
             }
         }
-        
+
         // Handle selection completion
         private void ChatBoxSelector_SelectionComplete(object? sender, Rect selectionRect)
         {
             // Use the existing ChatBoxWindow.Instance
             chatBoxWindow = ChatBoxWindow.Instance;
-            
+
             // Check if event handlers are already attached
             if (!_chatBoxEventsAttached && chatBoxWindow != null)
             {
@@ -1690,7 +1684,7 @@ namespace ScreenTranslation
                     isChatBoxVisible = false;
                     chatBoxButton.Background = BlueBrush;
                 };
-                
+
                 // Also handle visibility changes for when the X button is clicked (which now hides instead of closes)
                 chatBoxWindow.IsVisibleChanged += (s, e) =>
                 {
@@ -1700,21 +1694,21 @@ namespace ScreenTranslation
                         chatBoxButton.Background = BlueBrush;
                     }
                 };
-                
+
                 _chatBoxEventsAttached = true;
             }
-            
+
             // Position and size the ChatBox
             chatBoxWindow!.Left = selectionRect.Left;
             chatBoxWindow.Top = selectionRect.Top;
             chatBoxWindow.Width = selectionRect.Width;
             chatBoxWindow.Height = selectionRect.Height;
-            
+
             // Show the ChatBox
             chatBoxWindow.Show();
             isChatBoxVisible = true;
             chatBoxButton.Background = RedBrush;
-            
+
             // The ChatBox will get its data from MainWindow.GetTranslationHistory()
             // No need to manually load entries, just trigger an update
             if (chatBoxWindow != null)
@@ -1761,47 +1755,47 @@ namespace ScreenTranslation
             {
                 _ = Task.Run(() => SendTranslatedTextToServer(translatedText));
             }
-            
+
         }
 
         private SocketIOClient.SocketIO? _socketClient;
         private Queue<TranslationItem> _pendingTranslations = new Queue<TranslationItem>();
         private volatile int _isSendingFlag = 0;
 
-        
+
         private class TranslationItem
         {
             public string Text { get; set; } = "";
             public int SequenceNumber { get; set; }
         }
 
-        
+
         private int _translationSequence = 0;
 
         private async Task SendTranslatedTextToServer(string text, string serverUrl = "http://localhost:9191")
         {
-            
+
             if (string.IsNullOrEmpty(text))
                 return;
-                
-            
+
+
             var translationItem = new TranslationItem
             {
                 Text = text,
                 SequenceNumber = Interlocked.Increment(ref _translationSequence)
             };
-            
+
             // Add to queue
             lock (_pendingTranslations)
             {
                 _pendingTranslations.Enqueue(translationItem);
             }
-            
+
             if (Interlocked.CompareExchange(ref _isSendingFlag, 1, 0) == 1)
                 return;
-            
+
             try
-            {        
+            {
                 while (true)
                 {
                     // Get all translated text in queue
@@ -1810,7 +1804,7 @@ namespace ScreenTranslation
                     {
                         if (_pendingTranslations.Count == 0)
                             break;
-                        
+
                         // Get max 10 item
                         itemsToProcess = new List<TranslationItem>();
                         int batchSize = Math.Min(10, _pendingTranslations.Count);
@@ -1822,9 +1816,9 @@ namespace ScreenTranslation
                                 break;
                         }
                     }
-                    
+
                     itemsToProcess.Sort((a, b) => a.SequenceNumber.CompareTo(b.SequenceNumber));
-                    
+
                     bool sentViaWebSocket = false;
                     if (_socketClient != null && _socketClient.Connected)
                     {
@@ -1832,12 +1826,13 @@ namespace ScreenTranslation
                         {
                             foreach (var item in itemsToProcess)
                             {
-                                await _socketClient.EmitAsync("send_translation", new { 
+                                await _socketClient.EmitAsync("send_translation", new
+                                {
                                     translation = item.Text,
                                     sequence = item.SequenceNumber
                                 });
                             }
-                            
+
                             Console.WriteLine($"✅ Sent {itemsToProcess.Count} translations via WebSocket");
                             sentViaWebSocket = true;
                         }
@@ -1847,7 +1842,7 @@ namespace ScreenTranslation
                             sentViaWebSocket = false;
                         }
                     }
-                    
+
                     // Fallback to HTTP
                     if (!sentViaWebSocket)
                     {
@@ -1855,48 +1850,50 @@ namespace ScreenTranslation
                         {
                             var batchData = new
                             {
-                                translations = itemsToProcess.Select(i => new { 
-                                    translation = i.Text, 
+                                translations = itemsToProcess.Select(i => new
+                                {
+                                    translation = i.Text,
                                     sequence = i.SequenceNumber
                                 }).ToArray()
                             };
-                            
+
                             var jsonContent = JsonSerializer.Serialize(batchData);
                             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                            
+
                             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
                             {
                                 var response = await _httpClient.PostAsync($"{serverUrl}/api/update-batch", content, cts.Token);
-                                
+
                                 if (response.IsSuccessStatusCode)
                                 {
                                     Console.WriteLine($"✅ Sent {itemsToProcess.Count} translations via HTTP batch API");
-                                    
+
                                     if (_socketClient == null || !_socketClient.Connected)
                                     {
                                         InitSocketIO(serverUrl);
                                     }
                                     continue;
                                 }
-                                
+
                                 Console.WriteLine("Batch API not available, sending individually");
                             }
-                            
+
                             foreach (var item in itemsToProcess)
                             {
                                 try
                                 {
-                                    var singleData = new { 
+                                    var singleData = new
+                                    {
                                         translation = item.Text,
                                         sequence = item.SequenceNumber
                                     };
                                     var singleJson = JsonSerializer.Serialize(singleData);
                                     var singleContent = new StringContent(singleJson, Encoding.UTF8, "application/json");
-                                    
+
                                     using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
                                     {
                                         var response = await _httpClient.PostAsync($"{serverUrl}/api/update", singleContent, cts.Token);
-                                        
+
                                         if (response.IsSuccessStatusCode)
                                         {
                                             Console.WriteLine($"✅ Sent translation #{item.SequenceNumber} via HTTP");
@@ -1912,7 +1909,7 @@ namespace ScreenTranslation
                                     Console.WriteLine($"❌ Error sending individual translation: {ex.Message}");
                                 }
                             }
-                            
+
                             if (_socketClient == null || !_socketClient.Connected)
                             {
                                 InitSocketIO(serverUrl);
@@ -1928,7 +1925,7 @@ namespace ScreenTranslation
             finally
             {
                 Interlocked.Exchange(ref _isSendingFlag, 0);
-                
+
                 lock (_pendingTranslations)
                 {
                     if (_pendingTranslations.Count > 0)
@@ -1947,7 +1944,7 @@ namespace ScreenTranslation
                 {
                     try { _socketClient.DisconnectAsync().Wait(1000); } catch { }
                 }
-                
+
                 _socketClient = new SocketIOClient.SocketIO(serverUrl, new SocketIOClient.SocketIOOptions
                 {
                     ConnectionTimeout = TimeSpan.FromSeconds(3),
@@ -1955,17 +1952,17 @@ namespace ScreenTranslation
                     ReconnectionAttempts = 3,
                     ReconnectionDelay = 1000
                 });
-                
+
                 _socketClient.OnConnected += (sender, e) =>
                 {
                     Console.WriteLine("✅ Connected to WebSocket");
                 };
-                
+
                 _socketClient.OnDisconnected += (sender, e) =>
                 {
                     Console.WriteLine("❌ Disconnected from WebSocket");
                 };
-                
+
                 _socketClient.ConnectAsync().Wait(3000);
             }
             catch (Exception ex)
@@ -1980,7 +1977,7 @@ namespace ScreenTranslation
         {
             AddTranslationToHistory(e.OriginalText, e.TranslatedText);
         }
-        
+
         private async void btnStartOcrServer_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1990,22 +1987,22 @@ namespace ScreenTranslation
 
                 // Get the OCR server port from the configuration
                 string ocrMethod = ConfigManager.Instance.GetOcrMethod();
-                
 
-                if (ocrMethod == "Windows OCR")
+
+                if (ocrMethod == "OneOCR")
                 {
                     System.Windows.MessageBox.Show($"{ocrMethod} doesn't require starting a server.", "Warning!!", MessageBoxButton.OK, MessageBoxImage.Information);
                     btnStartOcrServer.IsEnabled = true;
                     return;
                 }
-                
+
                 SetStatus($"Starting {ocrMethod} server...");
-                
+
                 // Start the OCR server
                 await OcrServerManager.Instance.StartOcrServerAsync(ocrMethod);
                 SetStatus($"Starting {ocrMethod} server ...");
                 var startTime = DateTime.Now;
-                while (!OcrServerManager.Instance.serverStarted) 
+                while (!OcrServerManager.Instance.serverStarted)
                 {
                     await Task.Delay(100); // Kiểm tra mỗi 100ms    
                     if (OcrServerManager.Instance.timeoutStartServer)
@@ -2014,7 +2011,7 @@ namespace ScreenTranslation
                         System.Windows.MessageBox.Show($"Server startup timeout {ocrMethod}. Please check if the environment has been installed and try again.",
                         "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         break;
-                    }    
+                    }
                 }
 
 
@@ -2045,7 +2042,7 @@ namespace ScreenTranslation
 
         private void btnStopOcrServer_Click(object sender, RoutedEventArgs e)
         {
-            if (ConfigManager.Instance.GetOcrMethod() == "PaddleOCR" || ConfigManager.Instance.GetOcrMethod() == "EasyOCR")
+            if (ConfigManager.Instance.GetOcrMethod() == "PaddleOCR" || ConfigManager.Instance.GetOcrMethod() == "OneOCR")
             {
                 if (isStarted)
                 {
@@ -2068,56 +2065,6 @@ namespace ScreenTranslation
             }
         }
 
-        private async void btnSetupOcrServer_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Disable the button to prevent multiple clicks
-                btnSetupOcrServer.IsEnabled = false;
-
-                // Get current OCR method
-                string ocrMethod = GetSelectedOcrMethod();
-
-
-                if (ocrMethod == "Windows OCR")
-                {
-                    System.Windows.MessageBox.Show($"{ocrMethod} doesn't require installing a environment.", "Warning!!", MessageBoxButton.OK, MessageBoxImage.Information);
-                    btnSetupOcrServer.IsEnabled = true;
-                    return;
-                }
-
-                // Show setup dialog
-                MessageBoxResult result = System.Windows.MessageBox.Show(
-                    $"Are you sure you want to install the environment for {ocrMethod}?\n\n" +
-                    "This process may take a long time and requires an internet connection",
-                    "Confirm installation",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    // Show status message
-                    SetStatus($"Setting up environment for {ocrMethod}...");
-
-                    // Run setup
-                    await Task.Run(() =>
-                    {
-                        OcrServerManager.Instance.SetupOcrEnvironment(ocrMethod);
-                    });
-
-                    SetStatus($"{ocrMethod} environment setup completed");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show($"Error installing OCR server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                // Reactivate the button after the operation is complete
-                btnSetupOcrServer.IsEnabled = true;
-            }
-        }
         private void clearSelectedArea()
         {
             int numberAreaCount = savedTranslationAreas.Count;
@@ -2133,7 +2080,7 @@ namespace ScreenTranslation
                 savedTranslationAreas.RemoveAt(currentAreaIndex);
 
                 // Default switch to area last index
-                if(savedTranslationAreas.Count >= 1)
+                if (savedTranslationAreas.Count >= 1)
                 {
                     SwitchToTranslationArea(savedTranslationAreas.Count - 1);
                 }
@@ -2157,7 +2104,7 @@ namespace ScreenTranslation
             selectAreaButton.Background = new SolidColorBrush(Color.FromRgb(69, 105, 176)); // Blue
 
             // Update capture area to default area
-                UpdateCaptureRect();
+            UpdateCaptureRect();
 
             Console.WriteLine("All translation areas have been cleared.");
 
@@ -2262,7 +2209,7 @@ namespace ScreenTranslation
             quickstartWindow.Owner = this;
             quickstartWindow.ShowDialog();
         }
-        
+
         private void CheckAndShowQuickstart()
         {
             bool showQuickstart = ConfigManager.Instance.IsNeedShowQuickStart();

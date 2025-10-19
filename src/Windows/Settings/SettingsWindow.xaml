@@ -201,22 +201,21 @@
                                 <!-- OCR Method -->
                                 <TextBlock Text="OCR Method:" Grid.Row="0" Grid.Column="0" 
                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="ocrMethodComboBox" Grid.Row="0" Grid.Column="1" 
-                                         Margin="0,5" SelectedIndex="1" SelectionChanged="OcrMethodComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="EasyOCR"/>
-                                    <ComboBoxItem Content="Windows OCR"/>
+                                <ComboBox x:Name="ocrMethodComboBox" Grid.Row="0" Grid.Column="1"
+                                         Margin="0,5" SelectedIndex="0" SelectionChanged="OcrMethodComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="OneOCR"/>
                                     <ComboBoxItem Content="PaddleOCR"/>
                                 </ComboBox>
                                 
-                                <!-- WINDOWS OCR integration -->
-                                <TextBlock Text="Windows OCR integration:" Grid.Row="1" Grid.Column="0" 
-                                          ToolTip="This feature will use windowsOCR as a filter for the results before sending them to other OCRs. This feature will improve performance but will reduce accuracy in some cases"
+                                <!-- One OCR integration -->
+                                <TextBlock Text="OneOCR integration:" Grid.Row="1" Grid.Column="0"
+                                          ToolTip="This feature will use OneOCR as a filter for the results before sending them to other OCRs."
                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <CheckBox x:Name="windowsOCRIntegrationCheckBox" Grid.Row="1" Grid.Column="1" 
+                                <CheckBox x:Name="oneOCRIntegrationCheckBox" Grid.Row="1" Grid.Column="1"
                                          Margin="0,5"
-                                         ToolTip="This feature will use windowsOCR as a filter for the results before sending them to other OCRs. This feature will improve performance but will reduce accuracy in some cases"
-                                         Checked="WindowsOCRIntegrationCheckBox_CheckedChanged" 
-                                         Unchecked="WindowsOCRIntegrationCheckBox_CheckedChanged"/>
+                                         ToolTip="This feature will use OneOCR as a filter for the results before sending them to other OCRs."
+                                        Checked="OneOCRIntegrationCheckBox_CheckedChanged"
+                                        Unchecked="OneOCRIntegrationCheckBox_CheckedChanged"/>
                                          
                                 <!-- Auto Translate -->
                                 <TextBlock Text="Auto Translate:" Grid.Row="2" Grid.Column="0" 
@@ -523,11 +522,10 @@
 
                                 <TextBlock x:Name="chatGptEndpointLabel" Text="Base Endpoint:" Grid.Row="2" Grid.Column="0"
                                           VerticalAlignment="Center" Margin="0,8,10,0" Visibility="Collapsed"
-                                          ToolTip="Base endpoint URL that will be combined with /v1/{model} for the full endpoint"/>
+                                          ToolTip="Base endpoint URL that will be combined with /chatbot/api/{model} for the full endpoint"/>
                                 <TextBox x:Name="chatGptEndpointTextBox" Grid.Row="2" Grid.Column="1"
                                          Margin="0,5" Visibility="Collapsed"
-                                         TextChanged="ChatGptEndpointTextBox_TextChanged"
-                                         ToolTip="Example: www.chatqa.asd.local (will become www.chatqa.asd.local/v1/gpt-41-nano)"/>
+                                         TextChanged="ChatGptEndpointTextBox_TextChanged"/>
 
                                 <TextBlock x:Name="chatGptPasswordLabel" Text="Password:" Grid.Row="3" Grid.Column="0"
                                           VerticalAlignment="Top" Margin="0,8,10,0" Visibility="Collapsed"/>
@@ -546,13 +544,10 @@
                                     </Grid.ColumnDefinitions>
                                     <ComboBox x:Name="chatGptModelComboBox" Grid.Column="0"
                                             SelectionChanged="ChatGptModelComboBox_SelectionChanged">
-                                        <ComboBoxItem Content="GPT-41 Nano" Tag="gpt-41-nano"/>
-                                        <ComboBoxItem Content="GPT-41 Mini" Tag="gpt-41-mini"/>
-                                        <ComboBoxItem Content="GPT-41" Tag="gpt-41"/>
+                                        <ComboBoxItem Content="GPT-41 Nano" Tag="41-nano-ktv"/>
+                                        <ComboBoxItem Content="GPT-41 Mini" Tag="41-mini-ktv"/>
+                                        <ComboBoxItem Content="GPT-41" Tag="41-ktv"/>
                                     </ComboBox>
-                                    <Button x:Name="viewChatGptModelsButton" Content="View Models" Grid.Column="1"
-                                           Margin="5,0,0,0" Padding="5,0" Click="ViewChatGptModelsButton_Click"
-                                           ToolTip="Open OpenAI models documentation in browser"/>
                                 </Grid>
                                 
                                 <!-- Prompt Label -->
@@ -653,7 +648,7 @@
                                         <TextBlock Grid.Row="0" Grid.Column="1" 
                                                 VerticalAlignment="Top" Margin="0,5,0,0" TextWrapping="Wrap">
                                             To install robotic language voices, go to Settings > Time &amp; language > Speech > Add voices. Select the language you want, 
-                                            click the Add button then wait for the voice to be added to the system. After that, reset the RstGameTranslation application 
+                                            click the Add button then wait for the voice to be added to the system. After that, reset the application 
                                             to display the new voices.
                                         </TextBlock>
                                         
@@ -848,154 +843,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Server Tab -->
-            <TabItem Header="Server">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="10">
-                        <!-- Server Settings -->
-                        <GroupBox Header="Server Setting" Margin="0,0,0,15" Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="Install Server (Once time):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <Button Grid.Row="0" Grid.Column="1" Click="InstallServerButton_Click" HorizontalAlignment="Left"
-                                        Width="100" Height="20" Margin="50,10,10,0">
-                                    <TextBlock Text="Install"/>
-                                </Button>
-                                <TextBlock Text="Remove Server:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <Button Grid.Row="1" Grid.Column="1" Click="RemoveServerButton_Click" HorizontalAlignment="Left"
-                                        Width="100" Height="20" Margin="50,10,10,0">
-                                    <TextBlock Text="Remove"/>
-                                </Button>
-                                <TextBlock Text="Start Server:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <Button Grid.Row="2" Grid.Column="1" Click="StartServerButton_Click" HorizontalAlignment="Left"
-                                        Width="100" Height="20" Margin="50,10,10,0">
-                                    <TextBlock Text="Start"/>
-                                </Button>
-                                <TextBlock Text="Send Translated Data To Server:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,10,10,0"/>
-                                <CheckBox x:Name="isSendDataToServerCheckBox" Grid.Row="3" Grid.Column="1" Margin="50,10,10,0"
-                                         Checked="IsSendDataToServerCheckBox_CheckedChanged"
-                                         Unchecked="IsSendDataToServerCheckBox_CheckedChanged"/>
-                            </Grid>
-                        </GroupBox>
-                        <GroupBox Header="Server Guide" Margin="0,0,0,15" Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="This feature allows you to create a local hotspot server. The server is responsible for displaying translated text retrieved from the ScreenTranslation app. You can access the server from any device within the LAN network." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="1" Grid.Column="1" Margin="10,10,0,0"/>
-                                <TextBlock Text="This feature allows you to use your phone as a screen to view translations, which is useful for people who do not use multiple monitors." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="2" Grid.Column="1" Margin="10,10,0,0"/>
-                            </Grid>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
 
-            <!--  Game Profile Tab -->
-            <TabItem Header="Game Profile">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="10">
-                        <!-- Audio Processing Settings -->
-                        <GroupBox Header="Game Profile Settings" Margin="0,0,0,15" Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="Profile Name" Grid.Row="0" Grid.Column="0" 
-                                          Margin="0,10,10,0"/>
-                                <TextBox x:Name="profileNameTextBox" Grid.Row="0" Grid.Column="1" 
-                                          Margin="0,5"/>
-                                <TextBlock Text="Select Profile:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox x:Name="profileComboBox" Grid.Row="1" Grid.Column="1" Margin="0,5">
-                                </ComboBox>
-                                <Button Grid.Row="0" Grid.Column="2" Click="CreateProfileButton_Click"
-                                        Width="100" Height="20" Margin="10,0">
-                                    <TextBlock Text="Create Profile"/>
-                                </Button>
-                                <Button Grid.Row="2" Grid.Column="1" Click="UpdateProfileButton_Click"
-                                        Width="100" Height="20" Margin="10,0">
-                                    <TextBlock Text="Update Profile"/>
-                                </Button>
-                                <Button Grid.Row="1" Grid.Column="2" Click="RemoveProfileButton_Click"
-                                        Width="100" Height="20" Margin="10,0">
-                                    <TextBlock Text="Remove Profile"/>
-                                </Button>
-                                <Button Grid.Row="2" Grid.Column="2" Click="LoadProfileButton_Click"
-                                        Width="100" Height="20" Margin="10,0">
-                                    <TextBlock Text="Load Profile"/>
-                                </Button>
-                                <TextBlock x:Name="statusUpdateGameProfile" Foreground="Green" Text="" HorizontalAlignment="Center"
-                                    Grid.Row="3" Grid.Column="1" Margin="0,20,0,0"/>
-                            </Grid>
-                        </GroupBox>
-                        <GroupBox Header="Game Profile Detail Function" Margin="0,0,0,15" Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock FontWeight="Bold" Text="Create Profile: " HorizontalAlignment="Left"
-                                    Grid.Row="0" Grid.Column="0" Margin="0,10,0,0"/>
-                                <TextBlock Text="To create a new profile, enter the profile name in the 'Profile Name' field and click the 'Create Profile' button." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="0" Grid.Column="1" Margin="10,10,0,0"/>
-                                <TextBlock Text="Important: Profile name must be unaccented characters and no spaces, for example: GodOfWar, GTAV, TheLastOfUs, etc" 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="Red"
-                                    Grid.Row="1" Grid.Column="1" Margin="10,10,0,0"/>
-                                <TextBlock FontWeight="Bold" Text="Remove Profile: " HorizontalAlignment="Left"
-                                    Grid.Row="2" Grid.Column="0" Margin="0,10,0,0"/>
-                                <TextBlock Text="To remove a new profile, select the profile name in the combobox 'Select Profile' and click the 'Remove Profile' button." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="2" Grid.Column="1" Margin="10,10,0,0"/>
-                                <TextBlock FontWeight="Bold" Text="Update Profile: " HorizontalAlignment="Left"
-                                    Grid.Row="3" Grid.Column="0" Margin="0,10,0,0"/>
-                                <TextBlock Text="To update a new profile, select the profile name in the combobox 'Select Profile' and click the 'Update Profile' button. This will update all current configs in settings to the profile you choose." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="3" Grid.Column="1" Margin="10,10,0,0"/>
-                                <TextBlock FontWeight="Bold" Text="Load Profile: " HorizontalAlignment="Left"
-                                    Grid.Row="4" Grid.Column="0" Margin="0,10,0,0"/>
-                                <TextBlock Text="To load a new profile, select the profile name in the combobox 'Select Profile' and click the 'Load Profile' button. This will apply all configurations from the selected profile to your current settings." 
-                                    HorizontalAlignment="Left" TextWrapping="Wrap"
-                                    Grid.Row="4" Grid.Column="1" Margin="10,10,0,0"/>
-                            </Grid>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
         </TabControl>
     </Grid>
 </Window>

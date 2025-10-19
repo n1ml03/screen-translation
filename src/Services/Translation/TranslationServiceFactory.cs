@@ -1,5 +1,3 @@
-using System;
-
 namespace ScreenTranslation
 {
     /// <summary>
@@ -14,14 +12,14 @@ namespace ScreenTranslation
         public static ITranslationService CreateService()
         {
             string currentService = ConfigManager.Instance.GetCurrentTranslationService();
-            
+
             return currentService switch
             {
                 "ChatGPT" => new ChatGptTranslationService(),
                 _ => new ChatGptTranslationService() // Default to ChatGPT if unknown
             };
         }
-        
+
         /// <summary>
         /// Create a specific translation service by name
         /// </summary>

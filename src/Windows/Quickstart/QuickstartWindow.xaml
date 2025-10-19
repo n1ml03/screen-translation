@@ -241,12 +241,7 @@
                     </TextBlock>
 
                     <TextBlock TextWrapping="Wrap" FontSize="14" Margin="0,0,0,20">
-                        Note: The OCR environment will be set up automatically when you click "Setup OCR" button.
-                    </TextBlock>
-
-                    <TextBlock TextWrapping="Wrap" FontSize="14" Margin="0,0,0,20">
-                        For advanced OCR methods (EasyOCR, PaddleOCR), you'll need to install and start the OCR server. 
-                        This can be done through the SetupOCR button on the main screen or button Setup OCR server below after completing this guide.
+                        Note: OneOCR is selected by default and works immediately without any additional setup.
                     </TextBlock>
                     <Grid Margin="0,0,0,20">
                         <Grid.RowDefinitions>
@@ -260,39 +255,23 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="OCR Method:" FontWeight="Bold" Margin="0,5,10,0"/>
                         <ComboBox Grid.Row="0" Grid.Column="1" x:Name="OcrMethodComboBox" Width="200" HorizontalAlignment="Left"/>
-                        <Button x:Name="setupOCR" Grid.Row="0" Grid.Column="2" Content="Setup OCR Server" Margin="0,5,0,0" Click="SetupOcrServer_Click"/>
                     </Grid>
 
                     <Border Background="#252525" CornerRadius="5" Padding="15" Margin="0,0,0,20">
                         <StackPanel>
                             <TextBlock FontWeight="Bold" FontSize="16" Foreground="#3498db" Margin="0,0,0,10">OCR Methods Comparison:</TextBlock>
 
-                            <!-- Windows OCR -->
-                            <Expander Header="Windows OCR (Recommended for beginners)" IsExpanded="True" Margin="0,0,0,10" Foreground="White">
+                            <!-- OneOCR -->
+                            <Expander Header="OneOCR (Recommended for beginners)" IsExpanded="True" Margin="0,0,0,10" Foreground="White">
                                 <StackPanel Margin="10,5,0,0">
                                     <TextBlock TextWrapping="Wrap" Foreground="White">
-                                        <Run FontWeight="Bold">Pros:</Run> Built-in, no additional setup required, works well for most Latin scripts
+                                        <Run FontWeight="Bold">Pros:</Run> Built-in Windows OCR engine, no additional setup required, works well for most languages supported by Windows
                                     </TextBlock>
                                     <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Cons:</Run> May be less accurate for some Asian languages. Requires installing the corresponding language pack in Windows
+                                        <Run FontWeight="Bold">Cons:</Run> Limited to languages supported by Windows OCR
                                     </TextBlock>
                                     <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Recommendation:</Run> Best choice for beginners or if you don't have a dedicated GPU
-                                    </TextBlock>
-                                </StackPanel>
-                            </Expander>
-
-                            <!-- EasyOCR -->
-                            <Expander Header="EasyOCR" Margin="0,0,0,10" Foreground="White">
-                                <StackPanel Margin="10,5,0,0">
-                                    <TextBlock TextWrapping="Wrap" Foreground="White">
-                                        <Run FontWeight="Bold">Pros:</Run> Good accuracy for many languages, supports GPU acceleration
-                                    </TextBlock>
-                                    <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Cons:</Run> Requires additional setup, slower than Windows OCR without GPU. Consumes a lot of GPU resources (20-30%)
-                                    </TextBlock>
-                                    <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Recommendation:</Run> NVIDIA RTX 4000 series and below
+                                        <Run FontWeight="Bold">Recommendation:</Run> Best choice for beginners or if you want the simplest setup (Default selection)
                                     </TextBlock>
                                 </StackPanel>
                             </Expander>
@@ -304,10 +283,10 @@
                                         <Run FontWeight="Bold">Pros:</Run> High accuracy with many languages
                                     </TextBlock>
                                     <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Cons:</Run> Requires additional setup, more resource-intensive. Consumes a lot of GPU resources (5-15%)
+                                        <Run FontWeight="Bold">Cons:</Run> Requires server setup and installation, more resource-intensive. Consumes a lot of GPU resources (5-15%)
                                     </TextBlock>
                                     <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="White">
-                                        <Run FontWeight="Bold">Recommendation:</Run> NVIDIA RTX 2000 series and above
+                                        <Run FontWeight="Bold">Recommendation:</Run> For advanced users with NVIDIA RTX 2000 series and above who need higher accuracy
                                     </TextBlock>
                                 </StackPanel>
                             </Expander>
@@ -342,8 +321,7 @@
 
                         <TextBlock Text="Base Endpoint:" FontWeight="Bold" Margin="0,10,0,5"/>
                         <TextBox x:Name="ChatGptEndpointTextBox" Width="300" HorizontalAlignment="Left"
-                                 TextChanged="ChatGptEndpointTextBox_TextChanged"
-                                 ToolTip="Example: www.chatqa.asd.local (will become www.chatqa.asd.local/v1/gpt-41-nano based on selected model)"/>
+                                 TextChanged="ChatGptEndpointTextBox_TextChanged"/>
 
                         <TextBlock Text="Password:" FontWeight="Bold" Margin="0,10,0,5"/>
                         <PasswordBox x:Name="ChatGptPasswordBox" Width="300" HorizontalAlignment="Left" PasswordChanged="ChatGptPasswordBox_PasswordChanged"/>
@@ -388,7 +366,7 @@
                             <TextBlock Grid.Row="0" Grid.Column="1" x:Name="LanguagesSummaryText" Text="Japanese → English" Margin="0,0,0,10"/>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="OCR Method:" FontWeight="Bold" Foreground="#3498db" Margin="0,0,10,10"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="OcrMethodSummaryText" Text="Windows OCR" Margin="0,0,0,10"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="OcrMethodSummaryText" Text="OneOCR" Margin="0,0,0,10"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Translation Service:" FontWeight="Bold" Foreground="#3498db" Margin="0,0,10,10"/>
                             <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TranslationServiceSummaryText" Text="ChatGPT"/>

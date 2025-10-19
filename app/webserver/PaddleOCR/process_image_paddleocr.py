@@ -122,7 +122,7 @@ def upscale_image(image, min_width=1024, min_height=768):
         new_size = (int(width * scale), int(height * scale))
         print(f"Upscaling image from ({width}, {height}) to {new_size}")
         # Use LANCZOS instead of ANTIALIAS which is deprecated in newer PIL
-        image = image.resize(new_size, Image.LANCZOS)
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
     return image, scale
 
 # Initialize with default language at module load time
