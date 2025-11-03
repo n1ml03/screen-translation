@@ -2336,9 +2336,9 @@ namespace STGameTranslation
             {
                 // Get the base directory of the application
                 string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "translation_server");
+                string workingDirectory = Path.Combine(baseDirectory, "webserver", "PaddleOCR");
                 // Choose the appropriate batch file and working directory based on the OCR method
-                string setupBatchFileName = "start_server.bat";
+                string setupBatchFileName = "RunServerPaddleOCR.bat";
                 // Check if batch file exists
                 string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
                 if (!File.Exists(setupBatchFilePath))
