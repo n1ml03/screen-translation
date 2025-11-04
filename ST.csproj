@@ -9,11 +9,11 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <EnablePreviewWinRT>true</EnablePreviewWinRT>
-    <AssemblyName>st</AssemblyName>
+    <AssemblyName>ScreenTranslation</AssemblyName>
     <OutputPath>app</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <RootNamespace>WPFScreenCapture</RootNamespace>
+    <RootNamespace>ScreenTranslation</RootNamespace>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultPageItems>false</EnableDefaultPageItems>
     <ApplicationIcon>media\AppIcon.ico</ApplicationIcon>
@@ -21,10 +21,11 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <AssemblyName>st_release</AssemblyName>
+    <AssemblyName>ScreenTranslation</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,8 +39,8 @@
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
     <None Remove="src\**\*.xaml" />
-    <ApplicationDefinition Include="src\App.xaml" />
-    <Page Include="src\**\*.xaml" Exclude="src\App.xaml" />
+    <ApplicationDefinition Include="src\App\App.xaml" />
+    <Page Include="src\**\*.xaml" Exclude="src\App\App.xaml" />
     <None Include="app.manifest" />
   </ItemGroup>
   

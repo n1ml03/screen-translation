@@ -1,0 +1,990 @@
+<Window
+    x:Class="ScreenTranslation.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="clr-namespace:ScreenTranslation"
+    mc:Ignorable="d"
+    Title="Settings"
+    Height="550"
+    Width="600"
+    WindowStyle="SingleBorderWindow"
+    ResizeMode="CanResizeWithGrip"
+    Icon="/media/AppIcon.ico">
+    <Grid>
+        <TabControl Margin="5">
+            <!-- Language Settings Tab -->
+            <TabItem Header="Language">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Language Settings -->
+                        <GroupBox Header="Language Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Source Language -->
+                                <TextBlock Text="Source Language:" Grid.Row="0" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="sourceLanguageComboBox" Grid.Row="0" Grid.Column="1" 
+                                         Margin="0,5" SelectedIndex="0" SelectionChanged="SourceLanguageComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="ja"/>
+                                    <ComboBoxItem Content="en"/>
+                                    <ComboBoxItem Content="ch_sim"/>
+                                    <ComboBoxItem Content="ch_tra"/>
+                                    <ComboBoxItem Content="ko"/>
+                                    <ComboBoxItem Content="vi"/>
+                                    <ComboBoxItem Content="fr"/>
+                                    <ComboBoxItem Content="ru"/>
+                                    <ComboBoxItem Content="de"/>
+                                    <ComboBoxItem Content="es"/>
+                                    <ComboBoxItem Content="it"/>
+                                    <ComboBoxItem Content="hi"/>
+                                    <ComboBoxItem Content="pt"/>
+                                    <ComboBoxItem Content="ar"/>
+                                    <ComboBoxItem Content="nl"/>
+                                    <ComboBoxItem Content="pl"/>
+                                    <ComboBoxItem Content="ro"/>
+                                    <ComboBoxItem Content="fa"/>
+                                    <ComboBoxItem Content="cs"/>
+                                    <ComboBoxItem Content="id"/>
+                                    <ComboBoxItem Content="th"/>
+                                    <ComboBoxItem Content="hr"/>
+                                </ComboBox>
+                                
+                                <!-- Swap Languages Button placed between source and target in its own column -->
+                                <Button x:Name="swapLanguagesButton" Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"
+                                        VerticalAlignment="Center" Width="30" Height="30" Margin="10,0"
+                                        Click="SwapLanguagesButton_Click" ToolTip="Swap source and target languages">
+                                    <TextBlock Text="⇄" FontSize="16" FontWeight="Bold" />
+                                </Button>
+                                
+                                <!-- Target Language -->
+                                <TextBlock Text="Target Language:" Grid.Row="1" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="targetLanguageComboBox" Grid.Row="1" Grid.Column="1" 
+                                         Margin="0,5" SelectedIndex="1" SelectionChanged="TargetLanguageComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="ja"/>
+                                    <ComboBoxItem Content="en"/>
+                                    <ComboBoxItem Content="ch_sim"/>
+                                    <ComboBoxItem Content="ch_tra"/>
+                                    <ComboBoxItem Content="ko"/>
+                                    <ComboBoxItem Content="vi"/>
+                                    <ComboBoxItem Content="fr"/>
+                                    <ComboBoxItem Content="ru"/>
+                                    <ComboBoxItem Content="de"/>
+                                    <ComboBoxItem Content="es"/>
+                                    <ComboBoxItem Content="it"/>
+                                    <ComboBoxItem Content="hi"/>
+                                    <ComboBoxItem Content="pt"/>
+                                    <ComboBoxItem Content="ar"/>
+                                    <ComboBoxItem Content="nl"/>
+                                    <ComboBoxItem Content="pl"/>
+                                    <ComboBoxItem Content="ro"/>
+                                    <ComboBoxItem Content="fa"/>
+                                    <ComboBoxItem Content="cs"/>
+                                    <ComboBoxItem Content="id"/>
+                                    <ComboBoxItem Content="th"/>
+                                    <ComboBoxItem Content="hr"/>
+                                </ComboBox>
+
+                                <!-- WinOCR Language Pack Check-->
+                                <TextBlock x:Name="checkLanguagePack" Text="Check Language Pack" Grid.Row="2" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"  ToolTip="Check if the language package is installed."/>
+                                <Button x:Name="checkLanguagePackButton" Grid.Row="2" Grid.Column="1"
+                                        Width="60" Height="20" Margin="10,0"
+                                        Click="CheckLanguagePackButton_Click">
+                                    <TextBlock Text="Check"/>
+                                </Button>
+                            </Grid>
+                        </GroupBox>
+                        <!-- Language Code Explanation -->
+                        <GroupBox Header="Language Mapping" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" 
+                                    Margin="0,15,0,0" TextWrapping="Wrap" FontSize="12">
+                                <Run>ja = Japanese</Run>
+                                <LineBreak/>
+                                <Run>en = English</Run>
+                                <LineBreak/>
+                                <Run>ch_sim = Chinese (Simplified)</Run>
+                                <LineBreak/>
+                                <Run>ko = Korean</Run>
+                                <LineBreak/>
+                                <Run>vi = Vietnamese</Run>
+                                <LineBreak/>
+                                <Run>fr = French</Run>
+                                <LineBreak/>
+                                <Run>ru = Russian</Run>
+                                <LineBreak/>
+                                <Run>de = German</Run>
+                                <LineBreak/>
+                                <Run>es = Spanish</Run>
+                                <LineBreak/>
+                                <Run>it = Italian</Run>
+                                <LineBreak/>
+                                <Run>hi = Hindi</Run>
+                            </TextBlock>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3" 
+                                Margin="0,15,0,0" TextWrapping="Wrap" FontSize="12">
+                                <Run>pt = Portuguese</Run>
+                                <LineBreak/>
+                                <Run>ar = Arabic</Run>
+                                <LineBreak/>
+                                <Run>nl = Dutch</Run>
+                                <LineBreak/>
+                                <Run>pl = Polish</Run>
+                                <LineBreak/>
+                                <Run>ro = Romanian</Run>
+                                <LineBreak/>
+                                <Run>fa = Farsi</Run>
+                                <LineBreak/>
+                                <Run>cs = Czech</Run>
+                                <LineBreak/>
+                                <Run>id = Indonesian</Run>
+                                <LineBreak/>
+                                <Run>th = ThaiLand</Run>
+                                <LineBreak/>
+                                <Run>ch_tra = Traditional Chinese</Run>
+                                <LineBreak/>
+                                <Run>hr = Croatian</Run>
+                            </TextBlock>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- OCR Settings Tab -->
+            <TabItem Header="OCR">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- OCR Settings -->
+                        <GroupBox Header="OCR Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- OCR Method -->
+                                <TextBlock Text="OCR Method:" Grid.Row="0" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="ocrMethodComboBox" Grid.Row="0" Grid.Column="1"
+                                         Margin="0,5" SelectedIndex="0" SelectionChanged="OcrMethodComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Windows OCR"/>
+                                    <ComboBoxItem Content="PaddleOCR"/>
+                                    <ComboBoxItem Content="OneOCR"/>
+                                </ComboBox>
+                                
+                                <!-- WINDOWS OCR integration -->
+                                <TextBlock Text="Windows OCR integration:" Grid.Row="1" Grid.Column="0" 
+                                          ToolTip="This feature will use windowsOCR as a filter for the results before sending them to other OCRs. This feature will improve performance but will reduce accuracy in some cases"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="windowsOCRIntegrationCheckBox" Grid.Row="1" Grid.Column="1" 
+                                         Margin="0,5"
+                                         ToolTip="This feature will use windowsOCR as a filter for the results before sending them to other OCRs. This feature will improve performance but will reduce accuracy in some cases"
+                                         Checked="WindowsOCRIntegrationCheckBox_CheckedChanged" 
+                                         Unchecked="WindowsOCRIntegrationCheckBox_CheckedChanged"/>
+                                         
+                                <!-- Auto Translate -->
+                                <TextBlock Text="Auto Translate:" Grid.Row="2" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="autoTranslateCheckBox" Grid.Row="2" Grid.Column="1" 
+                                         Margin="0,5" IsChecked="True" 
+                                         Checked="AutoTranslateCheckBox_CheckedChanged" 
+                                         Unchecked="AutoTranslateCheckBox_CheckedChanged"/>
+                                         
+                                <!-- Minimum Text Fragment Size -->
+                                <TextBlock Text="Smallest text fragment:" Grid.Row="3" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Minimum number of characters for a text fragment to be processed. Smaller fragments will be ignored."/>
+                                <TextBox x:Name="minTextFragmentSizeTextBox" Grid.Row="3" Grid.Column="1" 
+                                        Margin="0,5" Text="2" LostFocus="MinTextFragmentSizeTextBox_LostFocus"
+                                        ToolTip="Minimum number of characters for a text fragment to be processed. Smaller fragments will be ignored."/>
+                                
+                                <!-- Minimum Letter Confidence -->
+                                <TextBlock Text="Min letter confidence:" Grid.Row="4" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Minimum confidence threshold for individual letters/characters (0.0-1.0). Characters with confidence below this threshold will be filtered out."/>
+                                <TextBox x:Name="minLetterConfidenceTextBox" Grid.Row="4" Grid.Column="1" 
+                                        Margin="0,5" Text="0.1" LostFocus="MinLetterConfidenceTextBox_LostFocus"
+                                        ToolTip="Minimum confidence threshold for individual letters/characters (0.0-1.0). Characters with confidence below this threshold will be filtered out."/>
+                                
+                                <!-- Minimum Line Confidence -->
+                                <TextBlock Text="Min line confidence:" Grid.Row="5" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Minimum confidence threshold for text lines (0.0-1.0). Lines with average confidence below this threshold will be filtered out."/>
+                                <TextBox x:Name="minLineConfidenceTextBox" Grid.Row="5" Grid.Column="1" 
+                                        Margin="0,5" Text="0.2" LostFocus="MinLineConfidenceTextBox_LostFocus"
+                                        ToolTip="Minimum confidence threshold for text lines (0.0-1.0). Lines with average confidence below this threshold will be filtered out."/>
+                                
+                                <!-- Multi Selection Area -->
+                                <TextBlock Text="Multi Selection Area" Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"
+                                    ToolTip="Enable multi selection area for text selection."/>
+                                <CheckBox x:Name="multiSelectionAreaCheckBox" Grid.Row="6" Grid.Column="1" Margin="0,5"
+                                         Checked="MultiSelectionAreaCheckBox_CheckedChanged"
+                                         Unchecked="MultiSelectionAreaCheckBox_CheckedChanged"/>
+
+                                <!-- Leave Translation Onscreen -->
+                                <TextBlock Text="Leave translation onscreen:" Grid.Row="7" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Always show the translation on the Monitor window and don't bother showing the source language, makes it easier to read translations while new ones are being made"/>
+                                <CheckBox x:Name="leaveTranslationOnscreenCheckBox" Grid.Row="7" Grid.Column="1" 
+                                         Margin="0,5" IsChecked="False" 
+                                         Checked="LeaveTranslationOnscreenCheckBox_CheckedChanged" 
+                                         Unchecked="LeaveTranslationOnscreenCheckBox_CheckedChanged"
+                                         ToolTip="Always show the translation on the Monitor window and don't bother showing the source language, makes it easier to read translations while new ones are being made"/>
+                                
+                                <!-- Select Screen -->
+                                <TextBlock Text="Select Screen:" Grid.Row="8" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="screenComboBox" Grid.Row="8" Grid.Column="1"
+                                         Margin="0,5" SelectedIndex="1" SelectionChanged="ScreenComboBox_SelectionChanged">
+                                </ComboBox>
+
+                                <!-- Auto OCR -->
+                                <TextBlock Text="Auto OCR:" Grid.Row="9" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="AutoOCRCheckBox" Grid.Row="9" Grid.Column="1"
+                                         Checked="AutoOCRCheckBox_CheckedChanged"
+                                         Unchecked="AutoOCRCheckBox_CheckedChanged"
+                                         ToolTip="Auto OCR realtime, turn off this feature the program will not auto translate"/>
+                            </Grid>
+                        </GroupBox>
+                        
+                        <!-- Block Detection Settings -->
+                        <GroupBox Header="Block Detection Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Block Power -->
+                                <TextBlock Text="Block Power:" Grid.Row="0" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="If higher, text is more likely to be glued together to make a large paragraph. Lower does the opposite, good for say, tiny buttons or menu options. Also affects character-level grouping."/>
+                                <TextBox x:Name="blockDetectionPowerTextBox" Grid.Row="0" Grid.Column="1" 
+                                        Margin="0,5" Text="5" LostFocus="BlockDetectionPowerTextBox_LostFocus"
+                                        ToolTip="If higher, text is more likely to be glued together to make a large paragraph. Lower does the opposite, good for say, tiny buttons or menu options. Also affects character-level grouping."/>
+                                
+                                <!-- Settle Time -->
+                                <TextBlock Text="Settle Time (s):" Grid.Row="1" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Time in seconds to wait for the text to settle before capturing"/>
+                                <TextBox x:Name="settleTimeTextBox" Grid.Row="1" Grid.Column="1" 
+                                        Margin="0,5" Text="0.5" LostFocus="SettleTimeTextBox_LostFocus"
+                                        ToolTip="Time in seconds to wait for the text to settle before capturing"/>
+
+                                <!-- TextSimilar Threshold-->
+                                <TextBlock Text="Text Similar Threshold:" Grid.Row="2" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Check the similarity between two consecutive texts. &#x0a;For example, 0.5 is equivalent to 50% - if text 1 has a similarity greater than or equal to 50%, it will be skipped."/>
+                                <TextBox x:Name="textSimilarThresholdTextBox" Grid.Row="2" Grid.Column="1" 
+                                        Margin="0,5" Text="0.75" LostFocus="TextSimilarThresholdTextBox_LostFocus"
+                                        ToolTip="Check the similarity between two consecutive texts. &#x0a;For example, 0.5 is equivalent to 50% - if text 1 has a similarity greater than or equal to 50%, it will be skipped."/>
+                                
+                                <!-- Char Level Checkbox-->
+                                <TextBlock Text="Char Level:" Grid.Row="3" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Split OCR result to character"/>
+                                <CheckBox x:Name="charLevelCheckBox" Grid.Row="3" Grid.Column="1" 
+                                         Margin="0,5" IsChecked="True" 
+                                         Checked="CharLevelCheckBox_CheckedChanged" 
+                                         Unchecked="CharLevelCheckBox_CheckedChanged"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Translation Service Tab -->
+            <TabItem Header="Translation">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Translation Service Settings -->
+                        <GroupBox Header="Translation Service Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Translation Service -->
+                                <TextBlock Text="Translation Service:" Grid.Row="0" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="translationServiceComboBox" Grid.Row="0" Grid.Column="1"
+                                         Margin="0,5" SelectedIndex="0" SelectionChanged="TranslationServiceComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="ChatGPT"/>
+                                </ComboBox>
+
+                                <!-- ChatGPT Endpoint - Only visible when ChatGPT is selected -->
+                                <TextBlock x:Name="chatGptEndpointLabel" Text="Endpoint:" Grid.Row="1" Grid.Column="0"
+                                          VerticalAlignment="Top" Margin="0,8,10,0" Visibility="Collapsed"/>
+                                <Grid Grid.Row="1" Grid.Column="1" Visibility="Collapsed" x:Name="chatGptEndpointGrid" Margin="0,5,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBox x:Name="chatGptEndpointTextBox" Grid.Row="0" Grid.ColumnSpan="2"
+                                             VerticalAlignment="Top" Margin="0,0,0,2"
+                                             TextChanged="ChatGptEndpointTextBox_TextChanged" KeyDown="EndpointTextBox_KeyDown"
+                                             Tag="ChatGPT"/>
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="0,2,0,5" FontSize="11">
+                                        <Run>Enter your translation service endpoint URL</Run>
+                                    </TextBlock>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Username:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="chatGptUsernameTextBox" Grid.Row="2" Grid.Column="1" Margin="0,5" TextChanged="ChatGptUsernameTextBox_TextChanged"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Password:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <PasswordBox x:Name="chatGptPasswordBox" Grid.Row="3" Grid.Column="1" Margin="0,5" PasswordChanged="ChatGptPasswordBox_PasswordChanged"/>
+                                </Grid>
+
+                                <!-- Prompt Label -->
+                                <TextBlock x:Name="promptLabel" Text="Prompt Template:" Grid.Row="2" Grid.Column="0"
+                                          VerticalAlignment="Top" Margin="0,10,10,0"/>
+
+                                <!-- Prompt Editor -->
+                                <TextBox x:Name="promptTemplateTextBox" Grid.Row="2" Grid.Column="1"
+                                        Margin="0,10,0,0" AcceptsReturn="True" TextWrapping="Wrap"
+                                        MinHeight="150" MaxHeight="300" VerticalScrollBarVisibility="Auto"
+                                        FontFamily="Consolas" FontSize="12"
+                                        LostFocus="PromptTemplateTextBox_LostFocus"/>
+
+                                <!-- Save Button -->
+                                <Button x:Name="savePromptButton" Content="Save Prompt" Grid.Row="3" Grid.Column="1"
+                                       HorizontalAlignment="Right" Margin="0,10,0,0" Padding="10,5"
+                                       Click="SavePromptButton_Click"/>
+
+                                <!-- Restore Default Prompt Button -->
+                                <Button x:Name="restoreDefaultPromptButton" Content="Restore Default Prompt" Grid.Row="3" Grid.Column="1"
+                                       HorizontalAlignment="Left" Margin="0,10,0,0" Padding="10,5"
+                                       Click="RestoreDefaultPromptButton_Click"/>
+
+                                <!-- Status Text -->
+                                <TextBlock x:Name="statusPrompt" Text="Saved !!!" Grid.Row="3" Grid.Column="1" Visibility="Collapsed"
+                                       HorizontalAlignment="Center" Margin="0,10,0,0" Padding="10,5"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Translation Context Tab -->
+            <TabItem Header="Context">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Translation Context Settings -->
+                        <GroupBox Header="Translation Context Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Context Settings -->
+                                <TextBlock Text="Max Previous Context:" Grid.Row="0" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Maximum number of previous text pieces to include as context. Set to 0 to disable context."/>
+                                <TextBox x:Name="maxContextPiecesTextBox" Grid.Row="0" Grid.Column="1"
+                                        Margin="0,5" Text="3" LostFocus="MaxContextPiecesTextBox_LostFocus"
+                                        ToolTip="Maximum number of previous text pieces to include as context. Set to 0 to disable context."/>
+
+                                <TextBlock Text="Min Context Size:" Grid.Row="1" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Minimum size in characters for a text piece to be included as context. Helps avoid adding tiny menu labels or buttons as context."/>
+                                <TextBox x:Name="minContextSizeTextBox" Grid.Row="1" Grid.Column="1"
+                                        Margin="0,5" Text="20" LostFocus="MinContextSizeTextBox_LostFocus"
+                                        ToolTip="Minimum size in characters for a text piece to be included as context. Helps avoid adding tiny menu labels or buttons as context."/>
+
+                                <TextBlock Text="Min ChatBox Text Size:" Grid.Row="2" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="Minimum size in characters for text to be shown in ChatBox. Smaller text will be ignored."/>
+                                <TextBox x:Name="minChatBoxTextSizeTextBox" Grid.Row="2" Grid.Column="1"
+                                        Margin="0,5" Text="2" LostFocus="MinChatBoxTextSizeTextBox_LostFocus"
+                                        ToolTip="Minimum size in characters for text to be shown in ChatBox. Smaller text will be ignored."/>
+
+                                <TextBlock Text="Info about the game:" Grid.Row="3" Grid.Column="0"
+                                          VerticalAlignment="Top" Margin="0,8,10,0"
+                                          ToolTip="Information about the game being played to help the LLM translate more accurately."/>
+                                <TextBox x:Name="gameInfoTextBox" Grid.Row="3" Grid.Column="1"
+                                        Margin="0,5" TextChanged="GameInfoTextBox_TextChanged"
+                                        ToolTip="Information about the game being played to help the LLM translate more accurately."
+                                        AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalScrollBarVisibility="Auto"/>
+
+                                <!-- Clear Context Button -->
+                                <TextBlock Text="Clear Translation Context:" Grid.Row="4" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0"
+                                          ToolTip="Clear all translation history and context. Forces new translation on next capture."/>
+                                <Button x:Name="clearContextButton" Content="Clear Context" Grid.Row="4" Grid.Column="1"
+                                       HorizontalAlignment="Left" Width="100" Margin="0,8,0,10" Padding="5,3" Click="ClearContextButton_Click"
+                                       ToolTip="Clear all translation history and context. Forces new translation on next capture."/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Overlay Tab -->
+            <TabItem Header="Overlay">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Overlay Settings -->
+                        <GroupBox Header="Overlay Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Text Overlay Config -->
+                                <TextBlock Text="Text Overlay Config:" Grid.Row="0" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0"
+                                          ToolTip="Adjust overlay background and text colour"/>
+                                <Button x:Name="overlayConfig" Content="Adjust Config" Grid.Row="0" Grid.Column="1"
+                                       HorizontalAlignment="Left" Width="100" Margin="20,8,0,10" Padding="5,3" Click="AdjustOverlayConfig_Click"
+                                       ToolTip="Adjust overlay background and text colour"/>
+
+                                <!-- Auto Set Overlay Background Color Checkbox-->
+                                <TextBlock Text="Auto Set Overlay Background Color:" Grid.Row="1" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0"
+                                          ToolTip="Smart select background color for overlay base on image"/>
+                                <CheckBox x:Name="autoSetOverlayBackgroundColorcheckBox" Grid.Row="1" Grid.Column="1"
+                                         Margin="20,8,0,0" IsChecked="True" Padding="5,3"
+                                         Checked="AutoSetOverlayBackgroundColorcheckBox_CheckedChanged"
+                                         Unchecked="AutoSetOverlayBackgroundColorcheckBox_CheckedChanged"/>
+
+                                <!-- Show Icon Signal When Start OCR -->
+                                <TextBlock Text="Show Icon Signal When Start OCR" Grid.Row="2" Grid.Column="0"
+                                          VerticalAlignment="Center" Margin="0,8,10,0"
+                                          ToolTip="Show small icon when starting OCR and translate"/>
+                                <CheckBox x:Name="showIconSignalCheckBox" Grid.Row="2" Grid.Column="1"
+                                         Margin="20,8,0,0" IsChecked="True" Padding="5,3"
+                                         Checked="ShowIconSignal_CheckedChanged"
+                                         Unchecked="ShowIconSignal_CheckedChanged"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- Text Filtering Tab -->
+            <TabItem Header="Text Filtering">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Text Filtering Settings -->
+                        <GroupBox Header="Text Filtering Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Header for list -->
+                                <TextBlock Text="Phrases to ignore:" Grid.Row="0" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"
+                                          ToolTip="List of phrases that will be ignored during translation. If exact match is enabled, the whole text will be ignored if it matches. If disabled, the phrase will be removed from the text."/>
+                                
+                                <!-- ListView for phrases -->
+                                <ListView x:Name="ignorePhraseListView" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                                         Margin="0,5" Height="300" SelectionMode="Single" SelectionChanged="IgnorePhraseListView_SelectionChanged">
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Phrase" Width="350" DisplayMemberBinding="{Binding Phrase}"/>
+                                            <GridViewColumn Header="Exact Match" Width="100">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding ExactMatch}" Checked="IgnorePhrase_CheckedChanged" Unchecked="IgnorePhrase_CheckedChanged" Tag="{Binding Phrase}"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+                                
+                                <!-- Input for new phrase -->
+                                <TextBlock Text="Add new phrase:" Grid.Row="2" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,8,10,0"/>
+                                <TextBox x:Name="newIgnorePhraseTextBox" Grid.Row="2" Grid.Column="1" 
+                                        Margin="0,8,10,0"/>
+                                <CheckBox x:Name="newExactMatchCheckBox" Content="Exact Match" Grid.Row="2" Grid.Column="2" 
+                                         VerticalAlignment="Center" Margin="0,8,10,0" IsChecked="True"/>
+                                <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="3">
+                                    <Button x:Name="addIgnorePhraseButton" Content="Add" Margin="0,8,5,0" Width="60" Click="AddIgnorePhraseButton_Click"/>
+                                    <Button x:Name="removeIgnorePhraseButton" Content="Remove" Margin="0,8,0,0" Width="60" Click="RemoveIgnorePhraseButton_Click" IsEnabled="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- Text-to-Speech Tab -->
+            <TabItem Header="TTS">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Text-to-Speech Settings -->
+                        <GroupBox Header="Text-to-Speech Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- TTS Enabled -->
+                                <TextBlock Text="Enable TTS:" Grid.Row="0" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="ttsEnabledCheckBox" Grid.Row="0" Grid.Column="1" 
+                                         Margin="0,5"
+                                         Checked="TtsEnabledCheckBox_CheckedChanged" 
+                                         Unchecked="TtsEnabledCheckBox_CheckedChanged"/>
+                                
+                                <TextBlock Text="Exclude Character Name" Grid.Row="4" Grid.Column="0" 
+                                          ToolTip="The application will automatically exclude character's name in the dialogue. The required format is &lt;character name&gt;: &lt;dialogue&gt;"
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="excludeCharacterNameCheckBox" Grid.Row="4" Grid.Column="1" 
+                                         Margin="0,5" 
+                                         Checked="ExcludeCharacterNameCheckBox_CheckedChanged" 
+                                         Unchecked="ExcludeCharacterNameCheckBox_CheckedChanged"/>
+                                
+                                <!-- TTS Service -->
+                                <TextBlock Text="TTS Service:" Grid.Row="1" Grid.Column="0" 
+                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="ttsServiceComboBox" Grid.Row="1" Grid.Column="1"
+                                         Margin="0,5" SelectedIndex="0" SelectionChanged="TtsServiceComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Windows TTS"/>
+                                </ComboBox>
+                                
+                                <!-- Windows TTS Voice - Only visible when Windows TTS is selected -->
+                                <TextBlock x:Name="windowTTSVoiceLabel" Text="Windows TTS Voice:" Grid.Row="2" Grid.Column="0" 
+                                        VerticalAlignment="Center" Margin="0,5,10,0"/>
+                                <ComboBox x:Name="windowTTSVoiceComboBox" Grid.Row="2" Grid.Column="1" 
+                                        Margin="0,5" SelectionChanged="WindowTTSVoiceComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Microsoft An (vi-VN, Male)"/>
+                                    <ComboBoxItem Content="Microsoft David (en-US, Male)"/>
+                                </ComboBox>
+
+                                <!-- Windows TTS Guide GroupBox -->
+                                <GroupBox x:Name="windowsTTSGuide" Header="Windows TTS Guide" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,10,0,0" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <TextBlock Text="Robotic Voices:" Grid.Row="0" Grid.Column="0" 
+                                                VerticalAlignment="Top" Margin="0,5,10,0" FontWeight="Bold"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" 
+                                                VerticalAlignment="Top" Margin="0,5,0,0" TextWrapping="Wrap">
+                                            To install robotic language voices, go to Settings > Time &amp; language > Speech > Add voices. Select the language you want, 
+                                            click the Add button then wait for the voice to be added to the system. After that, reset the ScreenTranslation application 
+                                            to display the new voices.
+                                        </TextBlock>
+                                        
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                VerticalAlignment="Top" Margin="0,5,0,10" TextWrapping="Wrap">
+                                            For voice languages not available in the list, please select the Multilingual voices in the combo box. These voices can speak multiple languages in addition to their main language.
+                                        </TextBlock>
+                                    </Grid>
+                                </GroupBox>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            
+            <!-- Hot Keys Tab -->
+            <TabItem Header="HotKeys">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Hot Keys Settings -->
+                        <GroupBox Header="HotKeys Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="HotKey Functions:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="hotKeyFunctionComboBox" Grid.Row="0" Grid.Column="1" Padding="5,3" Margin="0,8,10,10" SelectionChanged="HotKeyFunctionComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="----------- Select -----------"/>
+                                    <ComboBoxItem Content="Start/Stop"/>
+                                    <ComboBoxItem Content="Overlay"/>
+                                    <ComboBoxItem Content="Setting"/>
+                                    <ComboBoxItem Content="Log"/>
+                                    <ComboBoxItem Content="Select Area"/>
+                                    <ComboBoxItem Content="Clear Areas"/>
+                                    <ComboBoxItem Content="Clear Selected Area"/>
+                                    <ComboBoxItem Content="Show Area"/>
+                                    <ComboBoxItem Content="ChatBox"/>
+                                    <ComboBoxItem Content="Area 1"/>
+                                    <ComboBoxItem Content="Area 2"/>
+                                    <ComboBoxItem Content="Area 3"/>
+                                    <ComboBoxItem Content="Area 4"/>
+                                    <ComboBoxItem Content="Area 5"/>
+                                </ComboBox>
+                                <TextBlock Text="Combine Keys:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="combineKey1" Grid.Row="1" Grid.Column="1" Padding="5,3" Margin="0,8,10,10">
+                                    <ComboBoxItem Content="----------- Select -----------"/>
+                                    <ComboBoxItem Content="CTRL"/>
+                                    <ComboBoxItem Content="SHIFT"/>
+                                    <ComboBoxItem Content="ALT"/>
+                                </ComboBox>
+                                <ComboBox x:Name="combineKey2" Grid.Row="1" Grid.Column="2" Padding="5,3" Margin="0,8,10,10">
+                                    <ComboBoxItem Content="----------- Select -----------"/>
+                                    <ComboBoxItem Content="A"/>
+                                    <ComboBoxItem Content="B"/>
+                                    <ComboBoxItem Content="C"/>
+                                    <ComboBoxItem Content="D"/>
+                                    <ComboBoxItem Content="E"/>
+                                    <ComboBoxItem Content="F"/>
+                                    <ComboBoxItem Content="G"/>
+                                    <ComboBoxItem Content="H"/>
+                                    <ComboBoxItem Content="J"/>
+                                    <ComboBoxItem Content="K"/>
+                                    <ComboBoxItem Content="L"/>
+                                    <ComboBoxItem Content="M"/>
+                                    <ComboBoxItem Content="N"/>
+                                    <ComboBoxItem Content="O"/>
+                                    <ComboBoxItem Content="V"/>
+                                    <ComboBoxItem Content="X"/>
+                                    <ComboBoxItem Content="Z"/>
+                                    <ComboBoxItem Content="Q"/>
+                                    <ComboBoxItem Content="W"/>
+                                    <ComboBoxItem Content="R"/>
+                                    <ComboBoxItem Content="T"/>
+                                    <ComboBoxItem Content="Y"/>
+                                    <ComboBoxItem Content="U"/>
+                                    <ComboBoxItem Content="I"/>
+                                    <ComboBoxItem Content="P"/>
+                                    <ComboBoxItem Content="0"/>
+                                    <ComboBoxItem Content="1"/>
+                                    <ComboBoxItem Content="2"/>
+                                    <ComboBoxItem Content="3"/>
+                                    <ComboBoxItem Content="4"/>
+                                    <ComboBoxItem Content="5"/>
+                                    <ComboBoxItem Content="6"/>
+                                    <ComboBoxItem Content="7"/>
+                                    <ComboBoxItem Content="8"/>
+                                    <ComboBoxItem Content="9"/>
+                                </ComboBox>
+                                <Button x:Name="setHotKeyButton" Content="Set HotKey" Grid.Row="2" Grid.Column="1"
+                                       HorizontalAlignment="Center" Width="100" Margin="0,8,0,10" Padding="5,3" Click="SetHotKeyButton_Click"
+                                       ToolTip="Set Modifed Hotkey"/>
+                                <TextBlock x:Name="statusUpdateHotKey" Foreground="Green" Text="HotKey update success" 
+                                    Visibility="Collapsed" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <!-- Language Code Explanation -->
+                                
+                                <GroupBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
+                                          Margin="0,15,0,0" Header="List HotKey:" FontSize="12">
+                                    <TextBlock TextWrapping="Wrap">
+                                        <Run x:Name="hotKeyStartStop">Start/Stop: ALT+G</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyOverlay">Overlay: ALT+F</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeySetting">Setting: ALT+P</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyLog">Log: ALT+L</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeySelectArea">Select Area: ALT+Q</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyClearAreas">Clear Areas: ALT+R</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyClearPreviousArea">Clear Selected Area: ALT+H</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyShowArea">Show Area: ALT+B</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyChatBox">ChatBox: ALT+C</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyArea1">Area 1: ALT+1</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyArea2">Area 2: ALT+2</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyArea3">Area 3: ALT+3</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyArea4">Area 4: ALT+4</Run>
+                                        <LineBreak/>
+                                        <Run x:Name="hotKeyArea5">Area 5: ALT+5</Run>
+                                    </TextBlock>
+                                </GroupBox>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Audio Processing Tab -->
+            <TabItem Header="Audio" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Audio Processing Settings -->
+                        <GroupBox Header="Audio Processing Settings (experimental!)" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Provider:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="audioProcessingProviderComboBox" Grid.Row="0" Grid.Column="1" Margin="0,5" SelectionChanged="AudioProcessingProviderComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="OpenAI Realtime API (Whisper)"/>
+                                </ComboBox>
+                                <TextBlock Text="Endpoint:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox x:Name="openAiRealtimeEndpointTextBox" Grid.Row="1" Grid.Column="1" Margin="0,5" TextChanged="OpenAiRealtimeEndpointTextBox_TextChanged"/>
+                                <CheckBox x:Name="audioServiceAutoTranslateCheckBox" Grid.Row="2" Grid.Column="1" Margin="0,5"
+                                         Content="Auto translate (using ChatGPT)"
+                                         Checked="AudioServiceAutoTranslateCheckBox_CheckedChanged"
+                                         Unchecked="AudioServiceAutoTranslateCheckBox_CheckedChanged"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Server Tab -->
+            <TabItem Header="Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Server Settings -->
+                        <GroupBox Header="Server Setting" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Install Server (Once time):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Button Grid.Row="0" Grid.Column="1" Click="InstallServerButton_Click" HorizontalAlignment="Left"
+                                        Width="100" Height="20" Margin="50,10,10,0">
+                                    <TextBlock Text="Install"/>
+                                </Button>
+                                <TextBlock Text="Remove Server:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Button Grid.Row="1" Grid.Column="1" Click="RemoveServerButton_Click" HorizontalAlignment="Left"
+                                        Width="100" Height="20" Margin="50,10,10,0">
+                                    <TextBlock Text="Remove"/>
+                                </Button>
+                                <TextBlock Text="Start Server:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Button Grid.Row="2" Grid.Column="1" Click="StartServerButton_Click" HorizontalAlignment="Left"
+                                        Width="100" Height="20" Margin="50,10,10,0">
+                                    <TextBlock Text="Start"/>
+                                </Button>
+                                <TextBlock Text="Send Translated Data To Server:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                                <CheckBox x:Name="isSendDataToServerCheckBox" Grid.Row="3" Grid.Column="1" Margin="50,10,10,0"
+                                         Checked="IsSendDataToServerCheckBox_CheckedChanged"
+                                         Unchecked="IsSendDataToServerCheckBox_CheckedChanged"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Header="Server Guide" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="This feature allows you to create a local hotspot server. The server is responsible for displaying translated text retrieved from the ScreenTranslation app. You can access the server from any device within the LAN network." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="1" Grid.Column="1" Margin="10,10,0,0"/>
+                                <TextBlock Text="This feature allows you to use your phone as a screen to view translations, which is useful for people who do not use multiple monitors." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="2" Grid.Column="1" Margin="10,10,0,0"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!--  Game Profile Tab -->
+            <TabItem Header="Game Profile">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <!-- Audio Processing Settings -->
+                        <GroupBox Header="Game Profile Settings" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Profile Name" Grid.Row="0" Grid.Column="0" 
+                                          Margin="0,10,10,0"/>
+                                <TextBox x:Name="profileNameTextBox" Grid.Row="0" Grid.Column="1" 
+                                          Margin="0,5"/>
+                                <TextBlock Text="Select Profile:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="profileComboBox" Grid.Row="1" Grid.Column="1" Margin="0,5">
+                                </ComboBox>
+                                <Button Grid.Row="0" Grid.Column="2" Click="CreateProfileButton_Click"
+                                        Width="100" Height="20" Margin="10,0">
+                                    <TextBlock Text="Create Profile"/>
+                                </Button>
+                                <Button Grid.Row="2" Grid.Column="1" Click="UpdateProfileButton_Click"
+                                        Width="100" Height="20" Margin="10,0">
+                                    <TextBlock Text="Update Profile"/>
+                                </Button>
+                                <Button Grid.Row="1" Grid.Column="2" Click="RemoveProfileButton_Click"
+                                        Width="100" Height="20" Margin="10,0">
+                                    <TextBlock Text="Remove Profile"/>
+                                </Button>
+                                <Button Grid.Row="2" Grid.Column="2" Click="LoadProfileButton_Click"
+                                        Width="100" Height="20" Margin="10,0">
+                                    <TextBlock Text="Load Profile"/>
+                                </Button>
+                                <TextBlock x:Name="statusUpdateGameProfile" Foreground="Green" Text="" HorizontalAlignment="Center"
+                                    Grid.Row="3" Grid.Column="1" Margin="0,20,0,0"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Header="Game Profile Detail Function" Margin="0,0,0,15" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock FontWeight="Bold" Text="Create Profile: " HorizontalAlignment="Left"
+                                    Grid.Row="0" Grid.Column="0" Margin="0,10,0,0"/>
+                                <TextBlock Text="To create a new profile, enter the profile name in the 'Profile Name' field and click the 'Create Profile' button." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="0" Grid.Column="1" Margin="10,10,0,0"/>
+                                <TextBlock Text="Important: Profile name must be unaccented characters and no spaces, for example: GodOfWar, GTAV, TheLastOfUs, etc" 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="Red"
+                                    Grid.Row="1" Grid.Column="1" Margin="10,10,0,0"/>
+                                <TextBlock FontWeight="Bold" Text="Remove Profile: " HorizontalAlignment="Left"
+                                    Grid.Row="2" Grid.Column="0" Margin="0,10,0,0"/>
+                                <TextBlock Text="To remove a new profile, select the profile name in the combobox 'Select Profile' and click the 'Remove Profile' button." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="2" Grid.Column="1" Margin="10,10,0,0"/>
+                                <TextBlock FontWeight="Bold" Text="Update Profile: " HorizontalAlignment="Left"
+                                    Grid.Row="3" Grid.Column="0" Margin="0,10,0,0"/>
+                                <TextBlock Text="To update a new profile, select the profile name in the combobox 'Select Profile' and click the 'Update Profile' button. This will update all current configs in settings to the profile you choose." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="3" Grid.Column="1" Margin="10,10,0,0"/>
+                                <TextBlock FontWeight="Bold" Text="Load Profile: " HorizontalAlignment="Left"
+                                    Grid.Row="4" Grid.Column="0" Margin="0,10,0,0"/>
+                                <TextBlock Text="To load a new profile, select the profile name in the combobox 'Select Profile' and click the 'Load Profile' button. This will apply all configurations from the selected profile to your current settings." 
+                                    HorizontalAlignment="Left" TextWrapping="Wrap"
+                                    Grid.Row="4" Grid.Column="1" Margin="10,10,0,0"/>
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
