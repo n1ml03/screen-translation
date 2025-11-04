@@ -12,9 +12,6 @@ using System.Drawing.Drawing2D;
 using System.Diagnostics;
 using System.Text;
 using System.Windows.Shell;
-using System.Net.Http;
-using System.Text.Json;
-using SocketIOClient;
 using Windows.ApplicationModel.VoiceCommands;
 
 
@@ -57,7 +54,6 @@ namespace ScreenTranslation
         private const uint MF_BYCOMMAND = 0x00000000;
         private const uint MF_GRAYED = 0x00000001;
         
-        private static readonly HttpClient _httpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
 
 
         [StructLayout(LayoutKind.Sequential)]
@@ -2011,223 +2007,11 @@ namespace ScreenTranslation
 
             //Console.WriteLine($"Translation added to history. History size: {_translationHistory.Count}");
             ChatBoxWindow.Instance!.OnTranslationWasAdded(originalText, translatedText);
-            if (ConfigManager.Instance.IsSendDataToServerEnabled())
-            {
-                _ = Task.Run(() => SendTranslatedTextToServer(translatedText));
-            }
             
         }
 
-        private SocketIOClient.SocketIO? _socketClient;
-        private Queue<TranslationItem> _pendingTranslations = new Queue<TranslationItem>();
-        private volatile int _isSendingFlag = 0;
 
-        
-        private class TranslationItem
-        {
-            public string Text { get; set; } = "";
-            public int SequenceNumber { get; set; }
-        }
 
-        
-        private int _translationSequence = 0;
-
-        private async Task SendTranslatedTextToServer(string text, string serverUrl = "http://localhost:9191")
-        {
-            
-            if (string.IsNullOrEmpty(text))
-                return;
-                
-            
-            var translationItem = new TranslationItem
-            {
-                Text = text,
-                SequenceNumber = Interlocked.Increment(ref _translationSequence)
-            };
-            
-            // Add to queue
-            lock (_pendingTranslations)
-            {
-                _pendingTranslations.Enqueue(translationItem);
-            }
-            
-            if (Interlocked.CompareExchange(ref _isSendingFlag, 1, 0) == 1)
-                return;
-            
-            try
-            {        
-                while (true)
-                {
-                    // Get all translated text in queue
-                    List<TranslationItem> itemsToProcess;
-                    lock (_pendingTranslations)
-                    {
-                        if (_pendingTranslations.Count == 0)
-                            break;
-                        
-                        // Get max 10 item
-                        itemsToProcess = new List<TranslationItem>();
-                        int batchSize = Math.Min(10, _pendingTranslations.Count);
-                        for (int i = 0; i < batchSize; i++)
-                        {
-                            if (_pendingTranslations.Count > 0)
-                                itemsToProcess.Add(_pendingTranslations.Dequeue());
-                            else
-                                break;
-                        }
-                    }
-                    
-                    itemsToProcess.Sort((a, b) => a.SequenceNumber.CompareTo(b.SequenceNumber));
-                    
-                    bool sentViaWebSocket = false;
-                    if (_socketClient != null && _socketClient.Connected)
-                    {
-                        try
-                        {
-                            foreach (var item in itemsToProcess)
-                            {
-                                await _socketClient.EmitAsync("send_translation", new { 
-                                    translation = item.Text,
-                                    sequence = item.SequenceNumber
-                                });
-                            }
-                            
-                            Console.WriteLine($"✅ Sent {itemsToProcess.Count} translations via WebSocket");
-                            sentViaWebSocket = true;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"❌ WebSocket error: {ex.Message}. Falling back to HTTP.");
-                            sentViaWebSocket = false;
-                        }
-                    }
-                    
-                    // Fallback to HTTP
-                    if (!sentViaWebSocket)
-                    {
-                        try
-                        {
-                            var batchData = new
-                            {
-                                translations = itemsToProcess.Select(i => new { 
-                                    translation = i.Text, 
-                                    sequence = i.SequenceNumber
-                                }).ToArray()
-                            };
-                            
-                            var jsonContent = JsonSerializer.Serialize(batchData);
-                            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                            
-                            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
-                            {
-                                var response = await _httpClient.PostAsync($"{serverUrl}/api/update-batch", content, cts.Token);
-                                
-                                if (response.IsSuccessStatusCode)
-                                {
-                                    Console.WriteLine($"✅ Sent {itemsToProcess.Count} translations via HTTP batch API");
-                                    
-                                    if (_socketClient == null || !_socketClient.Connected)
-                                    {
-                                        InitSocketIO(serverUrl);
-                                    }
-                                    continue;
-                                }
-                                
-                                Console.WriteLine("Batch API not available, sending individually");
-                            }
-                            
-                            foreach (var item in itemsToProcess)
-                            {
-                                try
-                                {
-                                    var singleData = new { 
-                                        translation = item.Text,
-                                        sequence = item.SequenceNumber
-                                    };
-                                    var singleJson = JsonSerializer.Serialize(singleData);
-                                    var singleContent = new StringContent(singleJson, Encoding.UTF8, "application/json");
-                                    
-                                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
-                                    {
-                                        var response = await _httpClient.PostAsync($"{serverUrl}/api/update", singleContent, cts.Token);
-                                        
-                                        if (response.IsSuccessStatusCode)
-                                        {
-                                            Console.WriteLine($"✅ Sent translation #{item.SequenceNumber} via HTTP");
-                                        }
-                                        else
-                                        {
-                                            Console.WriteLine($"❌ Failed to send translation #{item.SequenceNumber}");
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"❌ Error sending individual translation: {ex.Message}");
-                                }
-                            }
-                            
-                            if (_socketClient == null || !_socketClient.Connected)
-                            {
-                                InitSocketIO(serverUrl);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"❌ HTTP batch error: {ex.Message}");
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _isSendingFlag, 0);
-                
-                lock (_pendingTranslations)
-                {
-                    if (_pendingTranslations.Count > 0)
-                    {
-                        _ = SendTranslatedTextToServer(string.Empty);
-                    }
-                }
-            }
-        }
-
-        private void InitSocketIO(string serverUrl = "http://localhost:9191")
-        {
-            try
-            {
-                if (_socketClient != null)
-                {
-                    try { _socketClient.DisconnectAsync().Wait(1000); } catch { }
-                }
-                
-                _socketClient = new SocketIOClient.SocketIO(serverUrl, new SocketIOClient.SocketIOOptions
-                {
-                    ConnectionTimeout = TimeSpan.FromSeconds(3),
-                    Reconnection = true,
-                    ReconnectionAttempts = 3,
-                    ReconnectionDelay = 1000
-                });
-                
-                _socketClient.OnConnected += (sender, e) =>
-                {
-                    Console.WriteLine("✅ Connected to WebSocket");
-                };
-                
-                _socketClient.OnDisconnected += (sender, e) =>
-                {
-                    Console.WriteLine("❌ Disconnected from WebSocket");
-                };
-                
-                _socketClient.ConnectAsync().Wait(3000);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ WebSocket init error: {ex.Message}");
-                _socketClient = null;
-            }
-        }
 
         // Handle translation events from Logic
         private void Logic_TranslationCompleted(object? sender, TranslationEventArgs e)
@@ -2255,13 +2039,24 @@ namespace ScreenTranslation
                 
                 SetStatus($"Starting {ocrMethod} server...");
                 
+                // Enable StopOCR button immediately so user can cancel if needed
+                btnStopOcrServer.IsEnabled = true;
+                
                 // Start the OCR server
                 await OcrServerManager.Instance.StartOcrServerAsync(ocrMethod);
                 SetStatus($"Starting {ocrMethod} server ...");
                 var startTime = DateTime.Now;
                 while (!OcrServerManager.Instance.serverStarted) 
                 {
-                    await Task.Delay(100); // Kiểm tra mỗi 100ms    
+                    await Task.Delay(100); // Kiểm tra mỗi 100ms
+                    
+                    // Check if user stopped the server
+                    if (!OcrServerManager.Instance.IsServerProcessRunning())
+                    {
+                        SetStatus($"{ocrMethod} server was stopped by user");
+                        break;
+                    }
+                    
                     if (OcrServerManager.Instance.timeoutStartServer)
                     {
                         SetStatus($"Cannot start {ocrMethod} server");
@@ -2283,12 +2078,15 @@ namespace ScreenTranslation
                 else
                 {
                     OcrServerManager.Instance.StopOcrServer();
+                    // Disable StopOCR button if server failed to start
+                    btnStopOcrServer.IsEnabled = false;
                 }
 
             }
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"Error starting OCR server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                btnStopOcrServer.IsEnabled = false;
             }
             finally
             {
@@ -2310,6 +2108,8 @@ namespace ScreenTranslation
                     // Stop OCR server
                     OcrServerManager.Instance.StopOcrServer();
                     SetStatus("OCR server has been stopped");
+                    // Disable the StopOCR button after stopping
+                    btnStopOcrServer.IsEnabled = false;
                 }
                 catch (Exception ex)
                 {

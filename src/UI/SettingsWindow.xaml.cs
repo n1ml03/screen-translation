@@ -2290,165 +2290,95 @@ namespace ScreenTranslation
             isNeedShowMessage = !enabled;
         }
 
-        private void InstallServerButton_Click(object sender, RoutedEventArgs e)
+        private async void InstallServerButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Get the base directory of the application
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "translation_server");
-                // Choose the appropriate batch file and working directory based on the OCR method
-                string setupBatchFileName = "install_requirements.bat";
-                // Check if batch file exists
-                string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                if (!File.Exists(setupBatchFilePath))
-                {
-                    Console.WriteLine($"File installation not found: {setupBatchFilePath}");
-                    return;
-                }
-                // Initialize process start info
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {setupBatchFileName}",
-                    WorkingDirectory = workingDirectory,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
-                };
+                // Disable the button to prevent multiple clicks
+                installServerButton.IsEnabled = false;
 
-                // Start the process
-                using (Process? setupProcess = Process.Start(startInfo))
-                {
-                    if (setupProcess == null)
-                    {
-                        Console.WriteLine("Unable to start the server installation process");
-                        return;
-                    }
-
-                    // Wait for the process to finish
-                    setupProcess.WaitForExit();
-
-                    Console.WriteLine($"The server installation process has been completed");
-                    return;
-                }
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error when installing server: {ex.Message}");
-                return;
-            }
-        }
-
-        private void StartServerButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Get the base directory of the application
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "webserver", "PaddleOCR");
-                // Choose the appropriate batch file and working directory based on the OCR method
-                string setupBatchFileName = "RunServerPaddleOCR.bat";
-                // Check if batch file exists
-                string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                if (!File.Exists(setupBatchFilePath))
-                {
-                    Console.WriteLine($"File start not found: {setupBatchFilePath}");
-                    return;
-                }
-                // Initialize process start info
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {setupBatchFileName}",
-                    WorkingDirectory = workingDirectory,
-                    UseShellExecute = true,
-                    CreateNoWindow = false
-                };
-
-                // Start the process
-                using (Process? setupProcess = Process.Start(startInfo))
-                {
-                    if (setupProcess == null)
-                    {
-                        Console.WriteLine("Unable to start the server process");
-                        return;
-                    }
-
-                    Console.WriteLine($"The server start process has been completed");
-                    return;
-                }
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error when start server: {ex.Message}");
-                return;
-            }
-        }
-
-        private void RemoveServerButton_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBoxResult result = System.Windows.MessageBox.Show(
-                    $"Are you sure you want to remove this hotspot server?",
-                    "Confirm Removal",
+                // Show confirmation dialog
+                MessageBoxResult result = System.Windows.MessageBox.Show(
+                    "Are you sure you want to install the environment for Translation Server?\n\n" +
+                    "This process will create a Python virtual environment and install all required dependencies.\n" +
+                    "This may take a long time and requires an internet connection.",
+                    "Confirm Installation",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
-            if (result == MessageBoxResult.Yes)
+                if (result == MessageBoxResult.Yes)
+                {
+                    Console.WriteLine("Setting up environment for Translation Server...");
+
+                    // Run setup using the standardized OcrServerManager method
+                    await Task.Run(() =>
+                    {
+                        OcrServerManager.Instance.SetupOcrEnvironment("PaddleOCR");
+                    });
+
+                    Console.WriteLine("Translation Server environment setup completed");
+                }
+            }
+            catch (Exception ex)
             {
-                try
-                {
-                    // Get the base directory of the application
-                    string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                    string workingDirectory = Path.Combine(baseDirectory, "translation_server");
-                    // Choose the appropriate batch file and working directory based on the OCR method
-                    string setupBatchFileName = "Remove_server.bat";
-                    // Check if batch file exists
-                    string setupBatchFilePath = Path.Combine(workingDirectory, setupBatchFileName);
-                    if (!File.Exists(setupBatchFilePath))
-                    {
-                        Console.WriteLine($"File start not found: {setupBatchFilePath}");
-                        return;
-                    }
-                    // Initialize process start info
-                    ProcessStartInfo startInfo = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c {setupBatchFileName}",
-                        WorkingDirectory = workingDirectory,
-                        UseShellExecute = true,
-                        CreateNoWindow = false
-                    };
-
-                    // Start the process
-                    using (Process? setupProcess = Process.Start(startInfo))
-                    {
-                        if (setupProcess == null)
-                        {
-                            Console.WriteLine("Unable to Remove the server");
-                            return;
-                        }
-
-                        Console.WriteLine($"The server has been removed");
-                        return;
-                    }
-
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error when remove server: {ex.Message}");
-                    return;
-                }
+                Console.WriteLine($"Error installing server: {ex.Message}");
+                System.Windows.MessageBox.Show($"Error installing server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // Re-enable the button after the operation is complete
+                installServerButton.IsEnabled = true;
             }
         }
 
-        private void IsSendDataToServerCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
+        private async void StartServerButton_Click(object sender, RoutedEventArgs e)
         {
-            bool enabled = isSendDataToServerCheckBox.IsChecked ?? false;
-            ConfigManager.Instance.SetSendDataToServer(enabled);
-            Console.WriteLine($"Settings window: Is send data to server set to {enabled}");
+            try
+            {
+                // Disable the button to prevent multiple clicks
+                startServerButton.IsEnabled = false;
+
+                Console.WriteLine("Starting Translation Server...");
+
+                // Start the server using OcrServerManager
+                bool success = await OcrServerManager.Instance.StartOcrServerAsync("PaddleOCR");
+
+                if (success)
+                {
+                    Console.WriteLine("Translation Server started successfully");
+                    System.Windows.MessageBox.Show(
+                        "Translation Server started successfully!\n\n" +
+                        "You can now access the server from any device on your network.\n" +
+                        "Check the console for the server URL.",
+                        "Server Started",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    Console.WriteLine("Failed to start Translation Server");
+                    System.Windows.MessageBox.Show(
+                        "Failed to start Translation Server.\n\n" +
+                        "Please make sure you have installed the server environment first.\n" +
+                        "Check the console for more details.",
+                        "Server Start Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error starting server: {ex.Message}");
+                System.Windows.MessageBox.Show($"Error starting server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // Re-enable the button after the operation is complete
+                startServerButton.IsEnabled = true;
+            }
         }
+
+
 
         private void WindowsOCRIntegrationCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
         {

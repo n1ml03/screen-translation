@@ -21,7 +21,6 @@ namespace ScreenTranslation
         private readonly Dictionary<string, string> _configValues;
         private string _currentTranslationService = "ChatGPT"; // Default to ChatGPT
 
-        private const string SEND_DATA_TO_SERVER = "send_data_to_server";
         private const string SHOW_ICON_SIGNAL = "show_icon_signal";
         public const string SHOW_QUICK_START = "show_quick_start";
 
@@ -293,7 +292,6 @@ namespace ScreenTranslation
             _configValues[HOTKEY_AREA_4] = "ALT+4";
             _configValues[HOTKEY_AREA_5] = "ALT+5";
             _configValues[SHOW_ICON_SIGNAL] = "true";
-            _configValues[SEND_DATA_TO_SERVER] = "false";
             _configValues[WINDOWS_OCR_INTEGRATION] = "false";
             _configValues[AUTO_OCR] = "true";
             _configValues[EXCLUDE_CHARACTER_NAME] = "false";
@@ -1322,18 +1320,6 @@ namespace ScreenTranslation
             Console.WriteLine($"Auto Set Overlay Background enabled: {enabled}");
         }
 
-        public bool IsSendDataToServerEnabled()
-        {
-            string value = GetValue(SEND_DATA_TO_SERVER, "false");
-            return value.ToLower() == "true";
-        }
-
-        public void SetSendDataToServer(bool enabled)
-        {
-            _configValues[SEND_DATA_TO_SERVER] = enabled.ToString().ToLower();
-            SaveConfig();
-            Console.WriteLine($"Send data to server enabled: {enabled}");
-        }
 
         //Get/Set AutoOCR
         public bool IsAutoOCREnabled()

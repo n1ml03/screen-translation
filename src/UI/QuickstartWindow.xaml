@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:ScreenTranslation"
         mc:Ignorable="d"
         Title="Screen Translation - Quick Start Guide" 
-        Height="600" Width="800"
+        Height="720" Width="800"
         Background="#1E1E1E"
         Foreground="White"
         WindowStartupLocation="CenterScreen">

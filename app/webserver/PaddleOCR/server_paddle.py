@@ -9,7 +9,7 @@ import queue
 import signal
 import sys
 
-# Import PaddleOCR implementation instead of EasyOCR
+# Import PaddleOCR implementation
 from process_image_paddleocr import process_image, release_gpu_resources
 
 # Configure logging
@@ -181,6 +181,16 @@ def main():
         s.settimeout(1)  # Set a timeout so we can check server_running flag periodically
         
         logger.info(f"Server started on {HOST}:{PORT}")
+        
+        # Create flag file to signal that server is ready
+        try:
+            import tempfile
+            flag_file_path = os.path.join(tempfile.gettempdir(), "paddleocr_ready.txt")
+            with open(flag_file_path, 'w') as f:
+                f.write(f"PaddleOCR server ready on {HOST}:{PORT}")
+            logger.info(f"Created ready flag file: {flag_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to create ready flag file: {e}")
         
         try:
             while server_running:

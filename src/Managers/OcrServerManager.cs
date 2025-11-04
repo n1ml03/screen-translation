@@ -97,6 +97,14 @@ namespace ScreenTranslation
                 Console.WriteLine("⏳ Waiting for ready flag...");
                 for (int i = 0; i < 90; i++) // 1 minute 30 seconds
                 {
+                    // Check if user stopped the server
+                    if (_currentServerProcess == null || _currentServerProcess.HasExited)
+                    {
+                        Console.WriteLine("Server process was stopped by user");
+                        timeoutStartServer = false;
+                        return false;
+                    }
+
                     if (File.Exists(flagFile))
                     {
                         Console.WriteLine($"✅ {ocrMethod} READY!");
@@ -128,6 +136,14 @@ namespace ScreenTranslation
             }
         }
         
+        /// <summary>
+        /// Check if the server process is still running
+        /// </summary>
+        public bool IsServerProcessRunning()
+        {
+            return _currentServerProcess != null && !_currentServerProcess.HasExited;
+        }
+
         /// <summary>
         /// Stop the OCR server if it's running
         /// </summary>
@@ -246,28 +262,124 @@ namespace ScreenTranslation
                 }
 
                 // Get the working directory
-                string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string workingDirectory = Path.Combine(baseDirectory, "webserver", "PaddleOCR");
+                string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                string rootDirectory = Path.GetDirectoryName(appDirectory) ?? appDirectory;
 
-                // Check if requirements.txt exists
-                string requirementsPath = Path.Combine(workingDirectory, "requirements.txt");
+                // If we're in a subdirectory of app, go up another level to reach the root
+                if (Path.GetFileName(rootDirectory)?.ToLower() == "app")
+                {
+                    rootDirectory = Path.GetDirectoryName(rootDirectory) ?? rootDirectory;
+                }
+
+                string workingDirectory = Path.Combine(appDirectory, "webserver", "PaddleOCR");
+
+                // Check if requirements.txt exists in root directory
+                string requirementsPath = Path.Combine(rootDirectory, "requirements.txt");
                 if (!File.Exists(requirementsPath))
                 {
                     Console.WriteLine($"Requirements file not found: {requirementsPath}");
                     return false;
                 }
 
-                // Initialize process start info for pip install
+                // Create virtual environment in root directory if it doesn't exist
+                string venvPath = Path.Combine(rootDirectory, "venv");
+                string pythonExecutable = Path.Combine(venvPath, "Scripts", "python.exe");
+
+                if (!Directory.Exists(venvPath))
+                {
+                    Console.WriteLine($"Creating virtual environment at: {venvPath}");
+
+                    ProcessStartInfo venvStartInfo = new ProcessStartInfo
+                    {
+                        FileName = "python",
+                        Arguments = "-m venv venv",
+                        WorkingDirectory = rootDirectory,
+                        UseShellExecute = false,
+                        CreateNoWindow = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    using (Process? venvProcess = Process.Start(venvStartInfo))
+                    {
+                        if (venvProcess == null)
+                        {
+                            Console.WriteLine("Unable to start venv creation process");
+                            return false;
+                        }
+
+                        string venvOutput = venvProcess.StandardOutput.ReadToEnd();
+                        string venvError = venvProcess.StandardError.ReadToEnd();
+                        venvProcess.WaitForExit();
+
+                        if (venvProcess.ExitCode != 0)
+                        {
+                            Console.WriteLine($"Virtual environment creation failed with exit code {venvProcess.ExitCode}");
+                            Console.WriteLine($"Output: {venvOutput}");
+                            Console.WriteLine($"Error: {venvError}");
+                            return false;
+                        }
+
+                        Console.WriteLine("Virtual environment created successfully");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Virtual environment already exists");
+
+                    // Check if dependencies are already installed
+                    Console.WriteLine("Checking if dependencies are already installed...");
+
+                    ProcessStartInfo checkStartInfo = new ProcessStartInfo
+                    {
+                        FileName = pythonExecutable,
+                        Arguments = "-m pip check",
+                        WorkingDirectory = rootDirectory,
+                        UseShellExecute = false,
+                        CreateNoWindow = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    using (Process? checkProcess = Process.Start(checkStartInfo))
+                    {
+                        if (checkProcess == null)
+                        {
+                            Console.WriteLine("Unable to start pip check process");
+                            // Continue with installation instead of failing
+                        }
+                        else
+                        {
+                            string checkOutput = checkProcess.StandardOutput.ReadToEnd();
+                            string checkError = checkProcess.StandardError.ReadToEnd();
+                            checkProcess.WaitForExit();
+
+                            if (checkProcess.ExitCode == 0)
+                            {
+                                Console.WriteLine("All dependencies are already installed. Skipping pip install.");
+                                return true;
+                            }
+                            else
+                            {
+                                Console.WriteLine("Some dependencies may be missing or have conflicts. Proceeding with pip install.");
+                            }
+                        }
+                    }
+                }
+
+                // Initialize process start info for pip install with verbose output
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
-                    FileName = "python",
-                    Arguments = $"-m pip install -r requirements.txt",
-                    WorkingDirectory = workingDirectory,
+                    FileName = pythonExecutable,
+                    Arguments = $"-m pip install -r requirements.txt --verbose",
+                    WorkingDirectory = rootDirectory,
                     UseShellExecute = false,
                     CreateNoWindow = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 };
+
+                Console.WriteLine("Installing Python dependencies...");
 
                 // Start the process
                 using (Process? setupProcess = Process.Start(startInfo))
@@ -287,14 +399,33 @@ namespace ScreenTranslation
 
                     if (setupProcess.ExitCode == 0)
                     {
+                        Console.WriteLine("Pip install completed successfully!");
+                        Console.WriteLine("Installation details:");
+                        if (!string.IsNullOrWhiteSpace(output))
+                        {
+                            Console.WriteLine("Output:");
+                            Console.WriteLine(output);
+                        }
+                        if (!string.IsNullOrWhiteSpace(error))
+                        {
+                            Console.WriteLine("Warnings/Info:");
+                            Console.WriteLine(error);
+                        }
                         Console.WriteLine($"The {ocrMethod} dependencies installation has been completed successfully");
                         return true;
                     }
                     else
                     {
                         Console.WriteLine($"Pip install failed with exit code {setupProcess.ExitCode}");
-                        Console.WriteLine($"Output: {output}");
-                        Console.WriteLine($"Error: {error}");
+                        Console.WriteLine("Error details:");
+                        if (!string.IsNullOrWhiteSpace(output))
+                        {
+                            Console.WriteLine($"Output: {output}");
+                        }
+                        if (!string.IsNullOrWhiteSpace(error))
+                        {
+                            Console.WriteLine($"Error: {error}");
+                        }
                         return false;
                     }
                 }

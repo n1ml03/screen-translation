@@ -1,3 +1,5 @@
+@echo off
+cd /d "%~dp0..\..\.."
 set KMP_DUPLICATE_LIB_OK=TRUE
-python server_paddle.py
+venv\Scripts\python.exe app\webserver\PaddleOCR\server_paddle.py
 pause
