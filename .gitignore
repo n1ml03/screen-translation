@@ -447,7 +447,9 @@ app/webserver/Miniconda3
 app/webserver/*.exe
 !app/webserver/
 !app/tessdata/
-!app/OneOcr
+!app/oneocr.dll
+!app/oneocr.onemodel
+!app/onnxruntime.dll
 
 
 #but keep a few things...
