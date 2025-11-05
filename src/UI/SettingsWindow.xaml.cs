@@ -1222,7 +1222,9 @@ namespace ScreenTranslation
                 bool isChatGptSelected = selectedService == "ChatGPT";
 
                 // Make sure the window is fully loaded and controls are initialized
-                if (chatGptEndpointLabel == null || chatGptEndpointGrid == null)
+                if (chatGptEndpointLabel == null || chatGptEndpointGrid == null ||
+                    chatGptUsernameLabel == null || chatGptUsernameTextBox == null ||
+                    chatGptPasswordLabel == null || chatGptPasswordBox == null)
                 {
                     Console.WriteLine("UI elements not initialized yet. Skipping visibility update.");
                     return;
@@ -1231,6 +1233,10 @@ namespace ScreenTranslation
                 // Show/hide ChatGPT-specific settings
                 chatGptEndpointLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
                 chatGptEndpointGrid.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptUsernameLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptUsernameTextBox.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptPasswordLabel.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
+                chatGptPasswordBox.Visibility = isChatGptSelected ? Visibility.Visible : Visibility.Collapsed;
 
                 // Show prompt template for ChatGPT (only service that supports prompts)
                 bool showPromptTemplate = isChatGptSelected;

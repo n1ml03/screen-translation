@@ -101,53 +101,75 @@ Khi chạy ứng dụng lần đầu, cửa sổ **Quick Start** sẽ xuất hi�
 ### Thiết lập ngôn ngữ (Language Settings)
 
 1. Mở cửa sổ **Settings** > tab **Language**
-2. Chọn **Source Language** (ngôn ngữ nguồn)
+2. Chọn **Source Language** (ngôn ngữ nguồn) từ danh sách các ngôn ngữ được hỗ trợ
 3. Chọn **Target Language** (ngôn ngữ đích)
 4. Nhấn nút ⇄ để đổi chỗ hai ngôn ngữ
+5. Nhấn **Check** để kiểm tra language pack Windows OCR (chỉ hiển thị khi chọn Windows OCR)
 
 **Các ngôn ngữ hỗ trợ:**
-- Tiếng Anh (en)
-- Tiếng Nhật (ja)
-- Tiếng Trung giản thể (ch_sim)
-- Tiếng Trung phồn thể (ch_tra)
-- Tiếng Hàn (ko)
-- Tiếng Việt (vi)
-- Tiếng Pháp (fr), Đức (de), Nga (ru), Tây Ban Nha (es), Ý (it)
-- Và nhiều ngôn ngữ khác...
+- Tiếng Anh (en), Tiếng Nhật (ja), Tiếng Trung giản thể (ch_sim), Tiếng Trung phồn thể (ch_tra)
+- Tiếng Hàn (ko), Tiếng Việt (vi), Tiếng Pháp (fr), Tiếng Đức (de), Tiếng Nga (ru)
+- Tiếng Tây Ban Nha (es), Tiếng Ý (it), Tiếng Hindi (hi), Tiếng Bồ Đào Nha (pt)
+- Tiếng Ả Rập (ar), Tiếng Hà Lan (nl), Tiếng Ba Lan (pl), Tiếng Romania (ro)
+- Tiếng Ba Tư (fa), Tiếng Séc (cs), Tiếng Indonesia (id), Tiếng Thái (th), Tiếng Croatia (hr)
+
+**Lưu ý:** Một số ngôn ngữ có thể yêu cầu cài đặt language pack bổ sung cho Windows OCR.
 
 ### Thiết lập OCR (OCR Configuration)
 
 #### 1. Chọn phương thức OCR
-- **Windows OCR**: Sử dụng OCR tích hợp Windows (khuyên dùng)
-- **OneOCR**: Công cụ OCR nhanh
-- **PaddleOCR**: OCR với độ chính xác cao
+- **Windows OCR**: Sử dụng OCR tích hợp của Windows. Ưu điểm: nhanh, chính xác cho nhiều ngôn ngữ, không cần cài đặt thêm
+- **OneOCR**: Công cụ OCR nhanh với hiệu suất cao, sử dụng model AI nhẹ
+- **PaddleOCR**: Công cụ OCR dựa trên PaddlePaddle với độ chính xác cao, hỗ trợ đa ngôn ngữ tốt
 
-#### 2. Thiết lập máy chủ OCR
-1. Nhấn nút **SetupOCR**
-2. Cấu hình các thông số:
-   - **Port**: Cổng kết nối (mặc định: 9998)
-   - **Language**: Ngôn ngữ OCR
-   - **Confidence thresholds**: Ngưỡng độ tin cậy
+#### 2. Các tham số OCR cơ bản
+- **Windows OCR integration**: Sử dụng Windows OCR làm bộ lọc trước khi gửi đến các OCR khác. Cải thiện hiệu suất nhưng có thể giảm độ chính xác trong một số trường hợp
+- **Auto Translate**: Tự động dịch văn bản ngay khi OCR phát hiện. Tắt để chỉ dịch khi được yêu cầu
+- **Smallest text fragment**: Kích thước tối thiểu (số ký tự) của đoạn văn bản để được xử lý. Các đoạn nhỏ hơn sẽ bị bỏ qua (mặc định: 2)
+- **Min letter confidence**: Ngưỡng độ tin cậy tối thiểu cho từng ký tự (0.0-1.0). Ký tự có độ tin cậy thấp hơn sẽ bị lọc (mặc định: 0.1)
+- **Min line confidence**: Ngưỡng độ tin cậy tối thiểu cho toàn bộ dòng (0.0-1.0). Dòng có độ tin cậy trung bình thấp hơn sẽ bị lọc (mặc định: 0.2)
 
-3. Nhấn **StartOCR** để khởi động máy chủ
+#### 3. Block Detection Settings
+- **Block Power**: Mức độ mạnh của việc ghép nhóm văn bản. Giá trị cao hơn làm văn bản dễ bị ghép thành đoạn lớn hơn, giá trị thấp hơn tách nhỏ hơn (tốt cho menu/button nhỏ). Ảnh hưởng đến việc nhóm ký tự theo cấp độ (mặc định: 5)
+- **Settle Time**: Thời gian chờ (giây) để văn bản ổn định trước khi chụp (mặc định: 0.5)
+- **Text Similar Threshold**: Kiểm tra độ tương tự giữa hai văn bản liên tiếp. Ví dụ: 0.5 = 50% - nếu văn bản 1 có độ tương tự >= 50% sẽ bị bỏ qua (mặc định: 0.75)
+- **Char Level**: Chia kết quả OCR thành từng ký tự riêng lẻ
 
-#### 3. Tùy chỉnh OCR nâng cao
-- **Min text fragment size**: Kích thước tối thiểu của đoạn văn bản
-- **Block detection scale**: Tỷ lệ phát hiện khối
-- **Min letter/line confidence**: Độ tin cậy tối thiểu
+#### 4. Các tùy chọn khác
+- **Multi Selection Area**: Cho phép chọn nhiều vùng dịch cùng lúc (tối đa 5 vùng)
+- **Leave translation onscreen**: Luôn hiển thị bản dịch trên cửa sổ Monitor, không hiển thị ngôn ngữ gốc để dễ đọc bản dịch hơn
+- **Select Screen**: Chọn màn hình để thực hiện OCR (quan trọng khi có nhiều màn hình)
+- **Auto OCR**: Tự động OCR theo thời gian thực. Tắt tính năng này sẽ dừng dịch tự động
 
 ### Thiết lập dịch thuật (Translation Settings)
 
 #### 1. Cấu hình ChatGPT
 1. Mở tab **Translation** trong Settings
-2. Nhập **ChatGPT Endpoint**
-3. Nhập **Username** và **Password**
-4. Kiểm tra kết nối
+2. Chọn **Translation Service**: Hiện tại chỉ hỗ trợ ChatGPT
+3. Nhập **Endpoint**: URL API endpoint của dịch vụ ChatGPT
+4. Nhập **Username** và **Password**: Thông tin xác thực
+5. Chỉnh sửa **Prompt Template**: Template prompt để hướng dẫn AI dịch thuật
 
-#### 2. Tùy chỉnh dịch thuật
-- **Max context pieces**: Số lượng ngữ cảnh tối đa
-- **Min context size**: Kích thước ngữ cảnh tối thiểu
-- **Game info**: Thông tin game (cho ngữ cảnh)
+#### 2. Các nút chức năng
+- **Save Prompt**: Lưu template prompt đã chỉnh sửa
+- **Restore Default Prompt**: Khôi phục về prompt mặc định
+
+#### 3. Template Prompt
+Template prompt là văn bản hướng dẫn AI cách dịch. Bao gồm:
+- Hướng dẫn ngôn ngữ nguồn và đích
+- Phong cách dịch thuật
+- Ngữ cảnh cụ thể của game/ứng dụng
+- Các quy tắc đặc biệt
+
+**Ví dụ prompt mặc định:**
+```
+Translate the following text from {source_lang} to {target_lang}. Maintain the original meaning and tone. Keep the translation natural and fluent.
+
+Text to translate:
+{text}
+
+Translation:
+```
 
 ### Chọn vùng dịch (Area Selection)
 
@@ -229,22 +251,124 @@ Khi chạy ứng dụng lần đầu, cửa sổ **Quick Start** sẽ xuất hi�
 - **ERROR**: Lỗi nghiêm trọng
 - **DEBUG**: Thông tin chi tiết (phát triển)
 
+### Thiết lập ngữ cảnh (Context Settings)
+
+#### 1. Các tham số ngữ cảnh
+- **Max Previous Context**: Số lượng đoạn văn bản trước đó tối đa để đưa vào ngữ cảnh. Đặt 0 để tắt ngữ cảnh (mặc định: 3)
+- **Min Context Size**: Kích thước tối thiểu (số ký tự) của đoạn văn bản để được đưa vào ngữ cảnh. Giúp tránh thêm menu/button nhỏ làm ngữ cảnh (mặc định: 20)
+- **Min ChatBox Text Size**: Kích thước tối thiểu (số ký tự) của văn bản để hiển thị trong ChatBox. Văn bản nhỏ hơn sẽ bị bỏ qua (mặc định: 2)
+- **Info about the game**: Thông tin về game đang chơi để giúp LLM dịch chính xác hơn
+
+#### 2. Quản lý ngữ cảnh
+- **Clear Translation Context**: Xóa tất cả lịch sử dịch thuật và ngữ cảnh. Buộc dịch mới trên lần chụp tiếp theo
+
+### Thiết lập hiển thị (Overlay Settings)
+
+#### 1. Cấu hình hiển thị
+- **Text Overlay Config**: Điều chỉnh màu nền và màu chữ cho overlay
+- **Auto Set Overlay Background Color**: Tự động chọn màu nền cho overlay dựa trên hình ảnh
+- **Show Icon Signal When Start OCR**: Hiển thị biểu tượng nhỏ khi bắt đầu OCR và dịch
+
+### Thiết lập lọc văn bản (Text Filtering)
+
+#### 1. Quản lý cụm từ bỏ qua
+- **Danh sách cụm từ**: Danh sách các cụm từ sẽ bị bỏ qua khi dịch
+- **Exact Match**: Nếu bật, toàn bộ văn bản sẽ bị bỏ qua nếu khớp chính xác. Nếu tắt, cụm từ sẽ bị xóa khỏi văn bản
+
+#### 2. Thao tác với danh sách
+- **Add new phrase**: Thêm cụm từ mới vào danh sách
+- **Remove**: Xóa cụm từ đã chọn khỏi danh sách
+
+### Thiết lập Text-to-Speech (TTS)
+
+#### 1. Cấu hình TTS cơ bản
+- **Enable TTS**: Bật/tắt chức năng chuyển văn bản thành giọng nói
+- **TTS Service**: Chọn dịch vụ TTS (hiện tại chỉ hỗ trợ Windows TTS)
+- **Windows TTS Voice**: Chọn giọng đọc từ danh sách các giọng có sẵn
+
+#### 2. Tùy chỉnh nâng cao
+- **Exclude Character Name**: Tự động loại trừ tên nhân vật trong hội thoại. Định dạng yêu cầu: `<tên nhân vật>: <hội thoại>`
+
+#### 3. Cài đặt giọng đọc Windows
+Để cài đặt giọng đọc robot:
+1. Vào Settings > Time & language > Speech > Add voices
+2. Chọn ngôn ngữ muốn thêm và nhấn Add
+3. Đợi giọng đọc được thêm vào hệ thống
+4. Khởi động lại ScreenTranslation để hiển thị giọng mới
+
+### Thiết lập phím tắt (HotKeys)
+
+#### 1. Cách thiết lập phím tắt
+1. Chọn **HotKey Functions** từ dropdown
+2. Chọn **Combine Keys** (CTRL, SHIFT, ALT)
+3. Chọn phím bổ sung (A-Z, 0-9, F1-F12, etc.)
+4. Nhấn **Set HotKey** để áp dụng
+
+#### 2. Danh sách phím tắt mặc định
+- **Start/Stop**: ALT+G (bắt đầu/dừng dịch)
+- **Overlay**: ALT+F (bật/tắt lớp phủ)
+- **Setting**: ALT+P (mở cửa sổ thiết lập)
+- **Log**: ALT+L (mở nhật ký)
+- **Select Area**: ALT+Q (chọn vùng)
+- **Clear Areas**: ALT+R (xóa tất cả vùng)
+- **Clear Selected Area**: ALT+H (xóa vùng đã chọn)
+- **Show Area**: ALT+B (hiển thị vùng)
+- **ChatBox**: ALT+C (mở cửa sổ chat)
+- **Area 1-5**: ALT+1 đến ALT+5 (chuyển đến vùng tương ứng)
+
+### Thiết lập máy chủ (Server Settings)
+
+#### 1. Cài đặt máy chủ
+- **Install Server**: Cài đặt môi trường Python và dependencies cho máy chủ dịch (chỉ cần 1 lần)
+- **Start Server**: Khởi động máy chủ dịch để hiển thị bản dịch trên các thiết bị khác
+
+#### 2. Cách sử dụng máy chủ dịch
+1. Nhấn 'Install' (thiết lập 1 lần - tạo môi trường Python và cài đặt dependencies)
+2. Nhấn 'Start' để khởi động máy chủ
+3. Truy cập máy chủ từ bất kỳ thiết bị nào trong mạng bằng URL hiển thị trong console
+
+**Lưu ý**: Máy chủ sẽ tự động nhận dữ liệu dịch. Hữu ích để xem bản dịch trên điện thoại hoặc máy tính bảng thay vì dùng nhiều màn hình.
+
+### Hồ sơ game (Game Profile)
+
+#### 1. Quản lý hồ sơ
+- **Profile Name**: Tên hồ sơ (không dấu, không khoảng trắng, ví dụ: GodOfWar, GTAV)
+- **Create Profile**: Tạo hồ sơ mới
+- **Remove Profile**: Xóa hồ sơ đã chọn
+- **Update Profile**: Cập nhật hồ sơ hiện tại
+- **Load Profile**: Tải hồ sơ đã lưu
+
+#### 2. Lưu ý khi tạo hồ sơ
+- Tên hồ sơ phải là ký tự không dấu, không có khoảng trắng
+- Ví dụ: GodOfWar, GTAV, TheLastOfUs, etc.
+- Mỗi hồ sơ lưu tất cả thiết lập của ứng dụng cho game cụ thể
+
 ## Các mẹo và thủ thuật (Tips & Tricks)
 
 ### Tối ưu hiệu suất
 1. **Chọn vùng nhỏ**: Chỉ chọn vùng cần thiết để tăng tốc độ
-2. **Sử dụng Windows OCR**: Thường nhanh và chính xác hơn
-3. **Điều chỉnh confidence**: Tăng ngưỡng để giảm văn bản nhiễu
+2. **Sử dụng Windows OCR**: Thường nhanh và chính xác hơn cho các ngôn ngữ phổ biến
+3. **Điều chỉnh confidence**: Tăng ngưỡng để giảm văn bản nhiễu, giảm false positive
+4. **Tắt Multi Selection Area**: Nếu chỉ cần 1 vùng để cải thiện hiệu suất
+5. **Điều chỉnh Block Power**: Giá trị thấp hơn cho UI game với nhiều text nhỏ
 
 ### Xử lý sự cố thường gặp
-1. **OCR không hoạt động**: Kiểm tra ngôn ngữ được cài đặt
-2. **Dịch không chính xác**: Kiểm tra kết nối API và ngôn ngữ
-3. **Ứng dụng lag**: Giảm tần suất capture hoặc chọn vùng nhỏ hơn
+1. **OCR không hoạt động**: Kiểm tra ngôn ngữ được cài đặt trong Windows Settings
+2. **Dịch không chính xác**: Kiểm tra kết nối API, endpoint URL và ngôn ngữ được chọn
+3. **Ứng dụng lag**: Giảm tần suất capture, chọn vùng nhỏ hơn, hoặc tăng settle time
+4. **Không có âm thanh TTS**: Kiểm tra Windows TTS voices đã được cài đặt
+5. **Phím tắt không hoạt động**: Kiểm tra xem có ứng dụng khác đang sử dụng phím tắt đó không
 
 ### Phím tắt hiệu quả
-- Sử dụng phím tắt để chuyển vùng nhanh
-- Thiết lập phím tắt phù hợp với thói quen
-- Kết hợp với game hoặc ứng dụng khác
+- Sử dụng phím tắt để chuyển vùng nhanh (ALT+1, ALT+2, etc.)
+- Thiết lập phím tắt phù hợp với thói quen gaming
+- Kết hợp với game hoặc ứng dụng khác để workflow mượt mà
+
+### Tối ưu hóa cho các loại nội dung khác nhau
+1. **Game RPG**: Bật context để AI hiểu được câu chuyện
+2. **Game Action**: Tăng settle time để text ổn định trước khi OCR
+3. **Menu/UI**: Giảm block power để tách riêng các item menu
+4. **Chat/Dialog**: Bật exclude character name để chỉ đọc nội dung hội thoại
 
 ## Cấu trúc dự án (Project Structure)
 
