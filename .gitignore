@@ -352,7 +352,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-*.manifest
 *.spec
 pip-log.txt
 pip-delete-this-directory.txt
